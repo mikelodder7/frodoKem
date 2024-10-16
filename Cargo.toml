@@ -1,0 +1,22 @@
+[package]
+authors = ["Michael Lodder <redmike7@gmail.com>"]
+categories = ["cryptography"]
+description = "A pure rust implementation of FrodoKEM that also includes some experimental features for Zero-Knowledge Proof of Encrypted Correctness"
+documentation = "https://docs.rs/frodo-kem-rs"
+edition = "2021"
+homepage = "https://github.com/mikelodder7/frodoKem"
+keywords = ["key", "quantum", "post", "zero", "knowledge", "encryption"]
+license = "Apache-2.0"
+name = "frodo-kem-rs"
+readme = "README.md"
+repository = "https://github.com/mikelodder7/frodoKem"
+version = "0.1.0"
+
+[dependencies]
+rand_core = { version = "0.6", features = ["std"] }
+serde = { version = "1.0", features = ["derive"] }
+thiserror = "1.0"
+zeroize = "1"
+
+[dev-dependencies]
+rstest = "0.23"
