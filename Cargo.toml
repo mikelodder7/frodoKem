@@ -5,18 +5,32 @@ description = "A pure rust implementation of FrodoKEM that also includes some ex
 documentation = "https://docs.rs/frodo-kem-rs"
 edition = "2021"
 homepage = "https://github.com/mikelodder7/frodoKem"
-keywords = ["key", "quantum", "post", "zero", "knowledge", "encryption"]
+keywords = ["quantum", "post", "zero", "knowledge", "encryption"]
 license = "Apache-2.0"
 name = "frodo-kem-rs"
 readme = "README.md"
 repository = "https://github.com/mikelodder7/frodoKem"
 version = "0.1.0"
 
+[features]
+default = ["frodo640aes", "frodo640shake", "frodo976aes", "frodo976shake", "frodo1344aes", "frodo1344shake"]
+experimental = []
+frodo640aes = ["aes"]
+frodo640shake = []
+frodo976aes = ["aes"]
+frodo976shake = []
+frodo1344aes = ["aes"]
+frodo1344shake = []
+
 [dependencies]
+aes = { version = "0.8", optional = true }
 rand_core = { version = "0.6", features = ["std"] }
 serde = { version = "1.0", features = ["derive"] }
+sha3 = { version = "0.10" }
 thiserror = "1.0"
 zeroize = "1"
 
 [dev-dependencies]
+rand_chacha = "0.3"
 rstest = "0.23"
+safe-oqs = { version = "0.10", default-features = false, features = ["frodokem"] }
