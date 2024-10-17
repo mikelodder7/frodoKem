@@ -120,7 +120,7 @@ impl<E: ExpandSeedA, S: NoiseSampler> FrodoKem<E, S> {
 
         let mut shake = sha3::Shake256::default();
         shake.update(&randomness[2 * self.params.bytes_pk_hash..]);
-        let pk_seed_a = shake.finalize_boxed_reset(self.params.bytes_seed_a);
+        let mut pk_seed_a = shake.finalize_boxed_reset(self.params.bytes_seed_a);
 
         let mut shake_input_seed_se = vec![0x5F; 1 + self.params.bytes_pk_hash];
         shake_input_seed_se[1..].copy_from_slice(randomness_seed_se);
@@ -169,9 +169,11 @@ impl<E: ExpandSeedA, S: NoiseSampler> FrodoKem<E, S> {
             .write(shake.finalize_boxed(self.params.bytes_pk_hash).as_ref())
             .expect("write pk hash");
 
+        b_matrix.zeroize();
         s_matrix.zeroize();
         randomness.zeroize();
         shake_input_seed_se.zeroize();
+        pk_seed_a.zeroize();
 
         (PublicKey(pk), SecretKey(sk))
     }
