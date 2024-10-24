@@ -122,11 +122,7 @@ impl<P: Params, E: Expanded, S: Sample> Params for FrodoKem<P, E, S> {
     const N_BAR: usize = P::N_BAR;
     const LOG_Q: usize = P::LOG_Q;
     const EXTRACTED_BITS: usize = P::EXTRACTED_BITS;
-    const STRIPE_STEP: usize = P::STRIPE_STEP;
-    const PARALLEL: usize = P::PARALLEL;
     const BYTES_SEED_A: usize = P::BYTES_SEED_A;
-    const BYTES_MU: usize = P::BYTES_MU;
-    const BYTES_PK_HASH: usize = P::BYTES_PK_HASH;
     const CDF_TABLE: &'static [u16] = P::CDF_TABLE;
     const CLAIMED_NIST_LEVEL: usize = P::CLAIMED_NIST_LEVEL;
     const SHARED_SECRET_LENGTH: usize = P::SHARED_SECRET_LENGTH;
@@ -160,11 +156,7 @@ impl Params for Frodo640 {
     const N_BAR: usize = 8;
     const LOG_Q: usize = 15;
     const EXTRACTED_BITS: usize = 2;
-    const STRIPE_STEP: usize = 8;
-    const PARALLEL: usize = 4;
     const BYTES_SEED_A: usize = 16;
-    const BYTES_MU: usize = 16;
-    const BYTES_PK_HASH: usize = 16;
     const CDF_TABLE: &'static [u16] = &[
         4643, 13363, 20579, 25843, 29227, 31145, 32103, 32525, 32689, 32745, 32762, 32766, 32767,
     ];

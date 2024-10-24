@@ -19,14 +19,14 @@ pub trait Params: Sized {
     const N_BAR: usize;
     const LOG_Q: usize;
     const EXTRACTED_BITS: usize;
-    const STRIPE_STEP: usize;
-    const PARALLEL: usize;
+    const STRIPE_STEP: usize = 8;
+    const PARALLEL: usize = 4;
     const BYTES_SEED_A: usize;
-    const BYTES_MU: usize;
-    const BYTES_PK_HASH: usize;
+    const BYTES_PK_HASH: usize = Self::SHARED_SECRET_LENGTH;
     const CDF_TABLE: &'static [u16];
     const CLAIMED_NIST_LEVEL: usize;
     const SHARED_SECRET_LENGTH: usize;
+    const BYTES_MU: usize = (Self::EXTRACTED_BITS * Self::N_BAR_X_N_BAR) / 8;
     /// = len(s) + len(seedSE) + len(z)
     const KEY_SEED_SIZE: usize = 2 * Self::SHARED_SECRET_LENGTH + Self::BYTES_SEED_A;
     const TWO_N: usize = 2 * Self::N;
