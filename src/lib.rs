@@ -24,12 +24,10 @@
 
 mod error;
 mod models;
-mod params;
 mod traits;
 
 pub use error::*;
 pub use models::*;
-pub use params::*;
 pub use traits::*;
 
 use rand_core::CryptoRngCore;
@@ -40,199 +38,41 @@ use std::{
 };
 use zeroize::Zeroize;
 
-#[cfg(feature = "frodo640aes")]
-/// The FrodoKEM-640-AES algorithm
-pub const FRODO_KEM_640_AES: FrodoKem<ExpandSeedAes, CdfSampler> = FrodoKem {
-    params: FRODO_640_PARAMS,
-    _generics: PhantomData,
-};
-#[cfg(feature = "frodo976aes")]
-/// The FrodoKEM-976-AES algorithm
-pub const FRODO_KEM_976_AES: FrodoKem<ExpandSeedAes, CdfSampler> = FrodoKem {
-    params: FRODO_976_PARAMS,
-    _generics: PhantomData,
-};
-
-#[cfg(feature = "frodo1344aes")]
-/// The FrodoKEM-1344-AES algorithm
-pub const FRODO_KEM_1344_AES: FrodoKem<ExpandSeedAes, CdfSampler> = FrodoKem {
-    params: FRODO_1344_PARAMS,
-    _generics: PhantomData,
-};
+// #[cfg(feature = "frodo640aes")]
+// /// The FrodoKEM-640-AES algorithm
+// pub const FRODO_KEM_640_AES: FrodoKem<ExpandSeedAes, CdfSampler> = FrodoKem {
+//     params: FRODO_640_PARAMS,
+//     _generics: PhantomData,
+// };
+// #[cfg(feature = "frodo976aes")]
+// /// The FrodoKEM-976-AES algorithm
+// pub const FRODO_KEM_976_AES: FrodoKem<ExpandSeedAes, CdfSampler> = FrodoKem {
+//     params: FRODO_976_PARAMS,
+//     _generics: PhantomData,
+// };
+//
+// #[cfg(feature = "frodo1344aes")]
+// /// The FrodoKEM-1344-AES algorithm
+// pub const FRODO_KEM_1344_AES: FrodoKem<ExpandSeedAes, CdfSampler> = FrodoKem {
+//     params: FRODO_1344_PARAMS,
+//     _generics: PhantomData,
+// };
 #[cfg(feature = "frodo640shake")]
 /// The FrodoKEM-640-SHAKE algorithm
-pub const FRODO_KEM_640_SHAKE: FrodoKem<ExpandSeedShake, CdfSampler> = FrodoKem {
-    params: FRODO_640_PARAMS,
-    _generics: PhantomData,
-};
-#[cfg(feature = "frodo976shake")]
-/// The FrodoKEM-976-SHAKE algorithm
-pub const FRODO_KEM_976_SHAKE: FrodoKem<ExpandSeedShake, CdfSampler> = FrodoKem {
-    params: FRODO_976_PARAMS,
-    _generics: PhantomData,
-};
-#[cfg(feature = "frodo1344shake")]
-/// The FrodoKEM-1344-SHAKE algorithm
-pub const FRODO_KEM_1344_SHAKE: FrodoKem<ExpandSeedShake, CdfSampler> = FrodoKem {
-    params: FRODO_1344_PARAMS,
-    _generics: PhantomData,
-};
+pub type FrodoKem640Shake = FrodoKem<Frodo640, FrodoShake<Frodo640>, FrodoCdfSample<Frodo640>>;
 
-/// The FrodoKEM struct
-#[derive(Copy, Clone, Debug)]
-pub struct FrodoKem<E: ExpandSeedA, S: NoiseSampler> {
-    /// The parameters for the FrodoKEM
-    params: Params,
-    _generics: PhantomData<(E, S)>,
-}
-
-impl<E: ExpandSeedA, S: NoiseSampler> FrodoKem<E, S> {
-    /// Create a new FrodoKEM instance
-    pub const fn new(params: Params) -> Self {
-        Self {
-            params,
-            _generics: PhantomData,
-        }
-    }
-
-    /// Get the parameters for the FrodoKEM
-    pub const fn params(&self) -> &Params {
-        &self.params
-    }
-
-    /// Get the algorithm name
-    pub fn algorithm(&self) -> String {
-        format!("FrodoKEM-{}-{}", self.params.n, E::METHOD)
-    }
-
-    /// Generate a keypair
-    ///
-    /// See Algorithm 9 in specification
-    pub fn generate_keypair(&self, mut rng: impl CryptoRngCore) -> (PublicKey, SecretKey) {
-        // holds the secret value s, the seed for S and E,
-        // and the seed for matrix A. Add seed_A to the public key
-        let mut randomness = vec![0u8; 2 * self.params.bytes_pk_hash + self.params.bytes_seed_a];
-        rng.fill_bytes(&mut randomness);
-
-        let randomness_s = &randomness[..self.params.bytes_pk_hash];
-        let randomness_seed_se =
-            &randomness[self.params.bytes_pk_hash..2 * self.params.bytes_pk_hash];
-
-        let mut shake = sha3::Shake256::default();
-        shake.update(&randomness[2 * self.params.bytes_pk_hash..]);
-        let mut pk_seed_a = shake.finalize_boxed_reset(self.params.bytes_seed_a);
-
-        let mut shake_input_seed_se = vec![0x5F; 1 + self.params.bytes_pk_hash];
-        shake_input_seed_se[1..].copy_from_slice(randomness_seed_se);
-        shake.update(&shake_input_seed_se);
-        let mut xof_reader = shake.finalize_xof_reset();
-
-        let n_x_nbar = self.params.n * self.params.n_bar;
-
-        let mut s_matrix = vec![0u16; 2 * n_x_nbar];
-        let mut u16_bytes = [0u8; 2];
-        for i in s_matrix.iter_mut() {
-            xof_reader.read(&mut u16_bytes);
-            *i = u16::from_le_bytes(u16_bytes);
-        }
-        S::sample(&self.params, &mut s_matrix[..n_x_nbar], n_x_nbar);
-        S::sample(&self.params, &mut s_matrix[n_x_nbar..], n_x_nbar);
-
-        let mut a_matrix = vec![0u16; n_x_nbar];
-        E::expand_a(&self.params, &mut a_matrix, pk_seed_a.as_ref());
-
-        let mut b_matrix = vec![0u16; n_x_nbar];
-        self.mul_add_as_plus_e(
-            &s_matrix[..n_x_nbar],
-            &s_matrix[n_x_nbar..],
-            &a_matrix,
-            &mut b_matrix,
-        );
-        let mut pk = vec![0u8; self.params.public_key_length];
-        pk[..self.params.bytes_seed_a].copy_from_slice(pk_seed_a.as_ref());
-        self.pack(
-            &b_matrix,
-            self.params.log_q as u8,
-            &mut pk[self.params.bytes_seed_a..],
-        );
-
-        let mut sk = vec![0u8; self.params.secret_key_length];
-        let mut cursor = Cursor::new(&mut sk);
-        cursor.write(randomness_s).expect("write s");
-        cursor.write(pk.as_slice()).expect("write pk");
-
-        for i in &s_matrix {
-            cursor.write(&i.to_le_bytes()).expect("write s_matrix");
-        }
-        shake.update(&pk);
-        cursor
-            .write(shake.finalize_boxed(self.params.bytes_pk_hash).as_ref())
-            .expect("write pk hash");
-
-        b_matrix.zeroize();
-        s_matrix.zeroize();
-        randomness.zeroize();
-        shake_input_seed_se.zeroize();
-        pk_seed_a.zeroize();
-
-        (PublicKey(pk), SecretKey(sk))
-    }
-
-    fn mul_add_as_plus_e(&self, s: &[u16], e: &[u16], a_matrix: &[u16], out: &mut [u16]) {
-        debug_assert_eq!(out.len(), e.len());
-        out.copy_from_slice(e);
-
-        // Matrix multiplication-addition A*s + e
-        for i in 0..self.params.n {
-            for k in 0..self.params.n_bar {
-                let mut sum = 0u16;
-                for j in 0..self.params.n {
-                    sum = sum.wrapping_add(
-                        a_matrix[i * self.params.n + j].wrapping_mul(s[k * self.params.n_bar + j]),
-                    );
-                }
-                out[i * self.params.n_bar + k] = out[i * self.params.n_bar + k].wrapping_add(sum);
-            }
-        }
-    }
-
-    fn pack(&self, input: &[u16], lsb: u8, out: &mut [u8]) {
-        // Pack the input u16 slice into a u8 output slice, copying lsb bits from each input element.
-        // If input.len * lsb / 8 > out.len, only out.len * 8 bits are copied.
-
-        let mut i = 0usize; // whole bytes already filled in
-        let mut j = 0usize; // whole uint16_t already copied
-        let mut w = 0u16; // the leftover, not yet copied
-        let mut bits = 0u8; // the number of lsb in w
-
-        while i < out.len() && (j < input.len() || ((j == input.len()) && (bits > 0))) {
-            let mut b = 0u8; // bits in out[i] already filled in
-            while b < 8 {
-                let nbits = std::cmp::min(8 - b, bits);
-                let mask = (1u16 << nbits).wrapping_sub(1);
-                let t = u8::try_from((w >> (bits - nbits)) & mask).expect("to fit in u8"); // the bits to copy from w to out
-                out[i] = out[i] + (t << (8 - b - nbits));
-                b += nbits;
-                bits -= nbits;
-                w &= !(mask << bits); // not strictly necessary; mostly for debugging
-
-                if bits == 0 {
-                    if j < input.len() {
-                        w = input[j];
-                        bits = lsb;
-                        j += 1;
-                    } else {
-                        break; // the input vector is exhausted
-                    }
-                }
-            }
-            if b == 8 {
-                // out[i] is filled in
-                i += 1;
-            }
-        }
-    }
-}
+// #[cfg(feature = "frodo976shake")]
+// /// The FrodoKEM-976-SHAKE algorithm
+// pub const FRODO_KEM_976_SHAKE: FrodoKem<ExpandSeedShake, CdfSampler> = FrodoKem {
+//     params: FRODO_976_PARAMS,
+//     _generics: PhantomData,
+// };
+// #[cfg(feature = "frodo1344shake")]
+// /// The FrodoKEM-1344-SHAKE algorithm
+// pub const FRODO_KEM_1344_SHAKE: FrodoKem<ExpandSeedShake, CdfSampler> = FrodoKem {
+//     params: FRODO_1344_PARAMS,
+//     _generics: PhantomData,
+// };
 
 #[cfg(test)]
 mod tests {
@@ -240,8 +80,59 @@ mod tests {
     use rand_core::SeedableRng;
 
     #[test]
-    fn compatibility() {
-        let mut rng = rand_chacha::ChaCha8Rng::from_seed([1u8; 32]);
-        let (our_pk, our_sk) = FRODO_KEM_640_AES.generate_keypair(rng);
+    fn parameter_calculations() {
+        assert_eq!(FrodoKem640Shake::N, 640);
+        assert_eq!(FrodoKem640Shake::N_BAR, 8);
+        assert_eq!(FrodoKem640Shake::LOG_Q, 15);
+        assert_eq!(FrodoKem640Shake::EXTRACTED_BITS, 2);
+        assert_eq!(FrodoKem640Shake::STRIPE_STEP, 8);
+        assert_eq!(FrodoKem640Shake::PARALLEL, 4);
+        assert_eq!(FrodoKem640Shake::BYTES_SEED_A, 16);
+        assert_eq!(FrodoKem640Shake::BYTES_MU, 16);
+        assert_eq!(FrodoKem640Shake::BYTES_PK_HASH, 16);
+        assert_eq!(
+            FrodoKem640Shake::CDF_TABLE,
+            &[
+                4643, 13363, 20579, 25843, 29227, 31145, 32103, 32525, 32689, 32745, 32762, 32766,
+                32767
+            ]
+        );
+        assert_eq!(FrodoKem640Shake::CLAIMED_NIST_LEVEL, 1);
+        assert_eq!(FrodoKem640Shake::SHARED_SECRET_LENGTH, 16);
+        assert_eq!(FrodoKem640Shake::METHOD, "SHAKE");
+        assert_eq!(FrodoKem640Shake::KEY_SEED_SIZE, 48);
+        assert_eq!(FrodoKem640Shake::TWO_N, 1280);
+        assert_eq!(FrodoKem640Shake::TWO_PLUS_BYTES_SEED_A, 18);
+        assert_eq!(FrodoKem640Shake::N_X_N, 409600);
+        assert_eq!(FrodoKem640Shake::N_X_N_BAR, 5120);
+        assert_eq!(FrodoKem640Shake::N_BAR_X_N, 5120);
+        assert_eq!(FrodoKem640Shake::N_BAR_X_N_BAR, 64);
+        assert_eq!(FrodoKem640Shake::TWO_N_X_N_BAR, 10240);
+        assert_eq!(FrodoKem640Shake::EXTRACTED_BITS_MASK, 3);
+        assert_eq!(FrodoKem640Shake::SHIFT, 13);
+        assert_eq!(FrodoKem640Shake::Q, 0x8000);
+        assert_eq!(FrodoKem640Shake::LOG_Q_MASK, 0x7FFF);
+        assert_eq!(FrodoKem640Shake::PUBLIC_KEY_LENGTH, 9616);
+        assert_eq!(FrodoKem640Shake::SECRET_KEY_LENGTH, 19888);
+        assert_eq!(FrodoKem640Shake::CIPHERTEXT_LENGTH, 9720);
+    }
+
+    #[test]
+    fn generate_keypair_compatibility() {
+        let rng = rand_chacha::ChaCha8Rng::from_seed([1u8; 32]);
+        let kem = FrodoKem640Shake::default();
+        let (our_pk, our_sk) = kem.generate_keypair(rng);
+        let kem = safe_oqs::kem::Kem::new(safe_oqs::kem::Algorithm::FrodoKem640Shake).unwrap();
+        let opt_pk = kem.public_key_from_bytes(&our_pk.0);
+        assert!(opt_pk.is_some());
+        let opt_sk = kem.secret_key_from_bytes(&our_sk.0);
+        assert!(opt_sk.is_some());
+
+        let their_pk = opt_pk.unwrap();
+        let their_sk = opt_sk.unwrap();
+
+        let (ciphertext, pk_ss) = kem.encapsulate(&their_pk).unwrap();
+        let sk_ss = kem.decapsulate(&their_sk, &ciphertext).unwrap();
+        assert_eq!(pk_ss.as_ref(), sk_ss.as_ref());
     }
 }
