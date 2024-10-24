@@ -38,12 +38,10 @@ use std::{
 };
 use zeroize::Zeroize;
 
-// #[cfg(feature = "frodo640aes")]
-// /// The FrodoKEM-640-AES algorithm
-// pub const FRODO_KEM_640_AES: FrodoKem<ExpandSeedAes, CdfSampler> = FrodoKem {
-//     params: FRODO_640_PARAMS,
-//     _generics: PhantomData,
-// };
+#[cfg(feature = "frodo640aes")]
+/// The FrodoKEM-640-AES algorithm
+pub type FrodoKem640Aes = FrodoKem<Frodo640, FrodoAes<Frodo640>, FrodoCdfSample<Frodo640>>;
+
 // #[cfg(feature = "frodo976aes")]
 // /// The FrodoKEM-976-AES algorithm
 // pub const FRODO_KEM_976_AES: FrodoKem<ExpandSeedAes, CdfSampler> = FrodoKem {
@@ -111,18 +109,37 @@ mod tests {
         assert_eq!(FrodoKem640Shake::EXTRACTED_BITS_MASK, 3);
         assert_eq!(FrodoKem640Shake::SHIFT, 13);
         assert_eq!(FrodoKem640Shake::Q, 0x8000);
-        assert_eq!(FrodoKem640Shake::LOG_Q_MASK, 0x7FFF);
+        assert_eq!(FrodoKem640Shake::Q_MASK, 0x7FFF);
         assert_eq!(FrodoKem640Shake::PUBLIC_KEY_LENGTH, 9616);
         assert_eq!(FrodoKem640Shake::SECRET_KEY_LENGTH, 19888);
         assert_eq!(FrodoKem640Shake::CIPHERTEXT_LENGTH, 9720);
     }
 
     #[test]
-    fn generate_keypair_compatibility() {
+    fn shake_generate_keypair_compatibility() {
         let rng = rand_chacha::ChaCha8Rng::from_seed([1u8; 32]);
         let kem = FrodoKem640Shake::default();
         let (our_pk, our_sk) = kem.generate_keypair(rng);
         let kem = safe_oqs::kem::Kem::new(safe_oqs::kem::Algorithm::FrodoKem640Shake).unwrap();
+        let opt_pk = kem.public_key_from_bytes(&our_pk.0);
+        assert!(opt_pk.is_some());
+        let opt_sk = kem.secret_key_from_bytes(&our_sk.0);
+        assert!(opt_sk.is_some());
+
+        let their_pk = opt_pk.unwrap();
+        let their_sk = opt_sk.unwrap();
+
+        let (ciphertext, pk_ss) = kem.encapsulate(&their_pk).unwrap();
+        let sk_ss = kem.decapsulate(&their_sk, &ciphertext).unwrap();
+        assert_eq!(pk_ss.as_ref(), sk_ss.as_ref());
+    }
+
+    #[test]
+    fn aes_generate_keypair_compatibility() {
+        let rng = rand_chacha::ChaCha8Rng::from_seed([1u8; 32]);
+        let kem = FrodoKem640Aes::default();
+        let (our_pk, our_sk) = kem.generate_keypair(rng);
+        let kem = safe_oqs::kem::Kem::new(safe_oqs::kem::Algorithm::FrodoKem640Aes).unwrap();
         let opt_pk = kem.public_key_from_bytes(&our_pk.0);
         assert!(opt_pk.is_some());
         let opt_sk = kem.secret_key_from_bytes(&our_sk.0);

@@ -173,10 +173,61 @@ impl Params for Frodo640 {
 }
 
 #[cfg(any(
+    feature = "frodo640aes",
+    feature = "frodo976aes",
+    feature = "frodo1344aes"
+))]
+/// Generate matrix A (N x N) column-wise using AES-128
+///
+/// See Algorithm 7
+#[derive(
+    Copy, Clone, Default, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Deserialize, Serialize,
+)]
+pub struct FrodoAes<P: Params>(pub(crate) PhantomData<P>);
+
+impl<P: Params> Expanded for FrodoAes<P> {
+    const METHOD: &'static str = "Aes";
+
+    fn expand_a(seed_a: &[u8], a: &mut [u16]) {
+        use aes::{
+            cipher::{BlockEncrypt, KeyInit, KeySizeUser},
+            Aes128Enc, Block,
+        };
+
+        debug_assert_eq!(a.len(), P::N_X_N);
+        debug_assert_eq!(seed_a.len(), P::BYTES_SEED_A);
+        debug_assert_eq!(seed_a.len(), <Aes128Enc as KeySizeUser>::key_size());
+
+        let enc = Aes128Enc::new_from_slice(seed_a).expect("a valid key size of 16 bytes");
+
+        let mut in_block = Block::default();
+        let mut out_block = Block::default();
+        for i in 0..P::N {
+            let ii = i as u16;
+            in_block[..2].copy_from_slice(&ii.to_le_bytes());
+            let row = i * P::N;
+            for j in (0..P::N).step_by(P::STRIPE_STEP) {
+                let jj = j as u16;
+                in_block[2..4].copy_from_slice(&jj.to_le_bytes());
+                enc.encrypt_block_b2b(&in_block, &mut out_block);
+
+                for k in 0..P::STRIPE_STEP {
+                    a[row + j + k] =
+                        u16::from_le_bytes([out_block[2 * k], out_block[2 * k + 1]]) & P::Q_MASK;
+                }
+            }
+        }
+    }
+}
+
+#[cfg(any(
     feature = "frodo640shake",
     feature = "frodo976shake",
     feature = "frodo1344shake"
 ))]
+/// Generate matrix A (N x N) column-wise using SHAKE-128
+///
+/// See Algorithm 8
 #[derive(
     Copy, Clone, Default, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Deserialize, Serialize,
 )]
@@ -191,6 +242,9 @@ impl<P: Params> Expanded for FrodoShake<P> {
     const METHOD: &'static str = "SHAKE";
     fn expand_a(seed_a: &[u8], a: &mut [u16]) {
         use sha3::digest::{ExtendableOutputReset, Update};
+
+        debug_assert_eq!(a.len(), P::N_X_N);
+        debug_assert_eq!(seed_a.len(), P::BYTES_SEED_A);
 
         let mut a_row = vec![0u8; P::TWO_N];
         let mut seed_separated = vec![0u8; P::TWO_PLUS_BYTES_SEED_A];
@@ -233,44 +287,3 @@ impl<P: Params> Sample for FrodoCdfSample<P> {
         }
     }
 }
-
-// #[cfg(any(
-//     feature = "frodo640shake",
-//     feature = "frodo976shake",
-//     feature = "frodo1344shake"
-// ))]
-// #[derive(Copy, Clone, Default, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-// pub struct FrodoShake;
-
-// #[cfg(any(
-//     feature = "frodo640shake",
-//     feature = "frodo976shake",
-//     feature = "frodo1344shake"
-// ))]
-// impl ExpandSeedA for FrodoShake {
-//     const METHOD: &'static str = "SHAKE";
-//
-//     fn expand_a<P: FrodoCore>(seed_a: &[u8; <P as FrodoCore>::BYTES_SEED_A]) -> [u16; <P as FrodoCore>::N_X_N] {
-//         use sha3::digest::{ExtendableOutputReset, Update, XofReader};
-//
-//         let mut a = [0u16; P::N_X_N];
-//         let mut a_row = [0u8; P::TWO_N];
-//         let mut seed_separated = [0u8; P::TWO_PLUS_BYTES_SEED_A];
-//         let mut shake = sha3::Shake128::default();
-//
-//         seed_separated[2..].copy_from_slice(seed_a);
-//
-//         for i in 0..P::N {
-//             seed_separated[0..2].copy_from_slice(&i.to_le_bytes());
-//             shake.update(&seed_separated);
-//             let mut read = shake.finalize_xof_reset();
-//             read.read(&mut a_row);
-//
-//             for j in 0..P::N {
-//                 a[i * P::N + j] = u16::from_le_bytes([a_row[j * 2], a_row[j * 2 + 1]]);
-//             }
-//         }
-//
-//         a
-//     }
-// }

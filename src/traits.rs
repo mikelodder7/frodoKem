@@ -41,7 +41,7 @@ pub trait Params: Sized {
     const SHIFT: usize = Self::LOG_Q - Self::EXTRACTED_BITS;
     const Q: usize = 1 << Self::LOG_Q;
     /// The mask for the modulus
-    const LOG_Q_MASK: u16 = Self::Q as u16 - 1;
+    const Q_MASK: u16 = Self::Q as u16 - 1;
     /// The public key length
     const PUBLIC_KEY_LENGTH: usize = (Self::LOG_Q * Self::N_X_N_BAR) / 8 + Self::BYTES_SEED_A;
     /// The secret key length
@@ -194,7 +194,7 @@ pub trait Kem: Params + Expanded + Sample {
                 for j in 0..Self::N {
                     sum = sum.wrapping_add(s[k_n + j].wrapping_mul(b[j * Self::N_BAR + i]));
                 }
-                out[k_bar + i] &= Self::LOG_Q_MASK;
+                out[k_bar + i] &= Self::Q_MASK;
             }
         }
     }
@@ -212,7 +212,7 @@ pub trait Kem: Params + Expanded + Sample {
                 for k in 0..Self::N {
                     sum = sum.wrapping_add(b[i_n + k].wrapping_mul(s[j * Self::N + k]));
                 }
-                out[i_bar + j] = sum & Self::LOG_Q_MASK;
+                out[i_bar + j] = sum & Self::Q_MASK;
             }
         }
     }
@@ -223,7 +223,7 @@ pub trait Kem: Params + Expanded + Sample {
         debug_assert_eq!(out.len(), Self::N_BAR_X_N_BAR);
         for i in 0..Self::N_BAR_X_N_BAR {
             out[i] = lhs[i].wrapping_add(rhs[i]);
-            out[i] &= Self::LOG_Q_MASK;
+            out[i] &= Self::Q_MASK;
         }
     }
 
@@ -233,7 +233,7 @@ pub trait Kem: Params + Expanded + Sample {
         debug_assert_eq!(out.len(), Self::N_BAR_X_N_BAR);
         for i in 0..Self::N_BAR_X_N_BAR {
             out[i] = lhs[i].wrapping_sub(rhs[i]);
-            out[i] &= Self::LOG_Q_MASK;
+            out[i] &= Self::Q_MASK;
         }
     }
 
@@ -271,7 +271,7 @@ pub trait Kem: Params + Expanded + Sample {
         let out_len = output.len();
         for i in 0..out_len {
             for j in 0..j_limit {
-                let mut t = (input[pos] & Self::LOG_Q_MASK) + add;
+                let mut t = (input[pos] & Self::Q_MASK) + add;
                 t >>= Self::SHIFT;
                 t &= Self::EXTRACTED_BITS_MASK;
                 output[i] |= (t as u8) << (j * Self::EXTRACTED_BITS);
@@ -286,14 +286,14 @@ pub trait Kem: Params + Expanded + Sample {
         let mut j = 0;
 
         while ii < input.len() {
-            let in0 = input[ii] & Self::LOG_Q_MASK;
-            let in1 = input[ii + 1] & Self::LOG_Q_MASK;
-            let in2 = input[ii + 2] & Self::LOG_Q_MASK;
-            let in3 = input[ii + 3] & Self::LOG_Q_MASK;
-            let in4 = input[ii + 4] & Self::LOG_Q_MASK;
-            let in5 = input[ii + 5] & Self::LOG_Q_MASK;
-            let in6 = input[ii + 6] & Self::LOG_Q_MASK;
-            let in7 = input[ii + 7] & Self::LOG_Q_MASK;
+            let in0 = input[ii] & Self::Q_MASK;
+            let in1 = input[ii + 1] & Self::Q_MASK;
+            let in2 = input[ii + 2] & Self::Q_MASK;
+            let in3 = input[ii + 3] & Self::Q_MASK;
+            let in4 = input[ii + 4] & Self::Q_MASK;
+            let in5 = input[ii + 5] & Self::Q_MASK;
+            let in6 = input[ii + 6] & Self::Q_MASK;
+            let in7 = input[ii + 7] & Self::Q_MASK;
 
             output[j] |= (in0 >> 7) as u8;
             output[j + 1] = (((in0 & 0x7F) as u8) << 1) | ((in1 >> 14) as u8);
@@ -369,170 +369,3 @@ pub trait Kem: Params + Expanded + Sample {
         }
     }
 }
-
-// ///  Generate matrix A (N x N) column-wise
-// pub trait ExpandSeedA {
-//     /// The method used to expand the seed
-//     const METHOD: &'static str;
-//
-//     /// Expand the seed to produce the matrix A
-//     fn expand_a(&self, seed_a: &[u8], a: &mut [u16]);
-// }
-//
-// #[cfg(any(
-//     feature = "frodo640aes",
-//     feature = "frodo976aes",
-//     feature = "frodo1344aes"
-// ))]
-// /// Generate matrix A (N x N) column-wise using AES-128
-// ///
-// /// See Algorithm 7
-// #[derive(Copy, Clone, Debug)]
-// pub struct ExpandSeedAes<P: FrodoParams>(pub(crate) PhantomData<P>);
-//
-// #[cfg(any(
-//     feature = "frodo640aes",
-//     feature = "frodo976aes",
-//     feature = "frodo1344aes"
-// ))]
-// impl ExpandSeedA for ExpandSeedAes {
-//     const METHOD: &'static str = "Aes";
-//
-//     fn expand_a(params: &Params, a_matrix: &mut [u16], seed_a: &[u8]) {
-//         use aes::{
-//             cipher::{BlockEncrypt, KeyInit, KeySizeUser},
-//             Aes128Enc, Block,
-//         };
-//
-//         assert_eq!(a_matrix.len(), 4 * params.n);
-//         assert_eq!(seed_a.len(), params.bytes_seed_a);
-//         assert_eq!(seed_a.len(), <Aes128Enc as KeySizeUser>::key_size());
-//         let enc = Aes128Enc::new_from_slice(seed_a).expect("a valid key size of 16 bytes");
-//         let mut a_temp = vec![0u16; a_matrix.len()];
-//
-//         for j in (0..params.n).step_by(params.stripe_step) {
-//             let jj = j as u16;
-//             a_temp[j + 1 + 0 * params.n] = jj;
-//             a_temp[j + 1 + 1 * params.n] = jj;
-//             a_temp[j + 1 + 2 * params.n] = jj;
-//             a_temp[j + 1 + 3 * params.n] = jj;
-//         }
-//
-//         for i in (0..params.n).step_by(4) {
-//             for j in (0..params.n).step_by(params.stripe_step) {
-//                 a_temp[j + 0 * params.n] = i as u16;
-//                 a_temp[j + 1 * params.n] = (i + 1) as u16;
-//                 a_temp[j + 2 * params.n] = (i + 2) as u16;
-//                 a_temp[j + 3 * params.n] = (i + 3) as u16;
-//             }
-//
-//             let mut j = 0;
-//             for i in (0..a_temp.len()).step_by(16) {
-//                 let mut in_block = Block::default();
-//                 in_block[..2].copy_from_slice(&a_temp[i].to_le_bytes());
-//                 in_block[2..4].copy_from_slice(&a_temp[i + 1].to_le_bytes());
-//                 in_block[4..6].copy_from_slice(&a_temp[i + 2].to_le_bytes());
-//                 in_block[6..8].copy_from_slice(&a_temp[i + 4].to_le_bytes());
-//                 in_block[8..10].copy_from_slice(&a_temp[i + 5].to_le_bytes());
-//                 in_block[10..12].copy_from_slice(&a_temp[i + 6].to_le_bytes());
-//                 in_block[12..14].copy_from_slice(&a_temp[i + 7].to_le_bytes());
-//                 in_block[14..16].copy_from_slice(&a_temp[i + 8].to_le_bytes());
-//
-//                 let mut out_block = Block::default();
-//                 enc.encrypt_block_b2b(&in_block, &mut out_block);
-//                 for k in 0..8 {
-//                     a_matrix[j] = u16::from_le_bytes([out_block[2 * k], out_block[2 * k + 1]]);
-//                     j += 1;
-//                 }
-//             }
-//         }
-//
-//         // for i in 0..params.n {
-//         //     let ii = i as u16;
-//         //     in_block[..2].copy_from_slice(&ii.to_le_bytes());
-//         //     let row = i * params.n;
-//         //     for j in (0..params.n).step_by(params.stripe_step) {
-//         //         let jj = j as u16;
-//         //         in_block[2..4].copy_from_slice(&jj.to_le_bytes());
-//         //         enc.encrypt_block_b2b(&in_block, &mut out_block);
-//         //
-//         //         for k in 0..params.stripe_step {
-//         //             a_matrix[row + j + k] =
-//         //                 u16::from_le_bytes([out_block[2 * k], out_block[2 * k + 1]]);
-//         //         }
-//         //     }
-//         // }
-//     }
-// }
-//
-// #[cfg(any(
-//     feature = "frodo640shake",
-//     feature = "frodo976shake",
-//     feature = "frodo1344shake"
-// ))]
-// /// Generate matrix A (N x N) column-wise using SHAKE-128
-// ///
-// /// See Algorithm 8
-// #[derive(Copy, Clone, Debug)]
-// pub struct ExpandSeedShake;
-//
-// #[cfg(any(
-//     feature = "frodo640shake",
-//     feature = "frodo976shake",
-//     feature = "frodo1344shake"
-// ))]
-// impl ExpandSeedA for ExpandSeedShake {
-//     const METHOD: &'static str = "Shake";
-//
-//     fn expand_a(params: &Params, a_matrix: &mut [u16], seed_a: &[u8]) {
-//         use sha3::digest::{ExtendableOutputReset, Update};
-//
-//         assert_eq!(a_matrix.len(), params.n * params.n * 2);
-//         assert_eq!(seed_a.len(), params.bytes_seed_a);
-//
-//         let mut in_bytes = vec![0u8; seed_a.len() + 2];
-//         in_bytes[2..].copy_from_slice(seed_a);
-//
-//         let mut shake = sha3::Shake128::default();
-//         for i in 0..params.n {
-//             let ii = i as u16;
-//             in_bytes[..2].copy_from_slice(&ii.to_le_bytes());
-//
-//             shake.update(&in_bytes);
-//             let out_bytes = shake.finalize_boxed_reset((16 * params.n) / 8);
-//
-//             let row = i * params.n;
-//             for j in 0..params.n {
-//                 a_matrix[row + j] = u16::from_le_bytes([out_bytes[2 * j], out_bytes[2 * j + 1]]);
-//             }
-//         }
-//     }
-// }
-//
-// /// Fills vector `s` with `n` samples
-// /// from a noise distribution.
-// pub trait NoiseSampler {
-//     /// Sample `n` values from the noise distribution into `s`.
-//     fn sample<P: FrodoCore>(s: &mut [u16]);
-// }
-//
-// /// A noise sampler that uses a CDF to sample values.
-// #[derive(Copy, Clone, Debug, Default, Eq, PartialEq, Ord, PartialOrd, Hash)]
-// pub struct CdfSampler;
-//
-// impl NoiseSampler for CdfSampler {
-//     fn sample<P: FrodoCore>(s: &mut [u16]) {
-//         let n = s.len();
-//         for i in 0..n {
-//             let mut sample = 0u16;
-//             let prnd = s[i] >> 1; // Drop the least significant bit
-//             let sign = s[i] & 1; // Get the least significant bit
-//
-//             for cdf in P::CDF_TABLE {
-//                 sample = sample.wrapping_add(cdf.wrapping_sub(prnd) >> 15);
-//             }
-//
-//             s[i] = (sign.wrapping_neg() ^ sample).wrapping_add(sign);
-//         }
-//     }
-// }
