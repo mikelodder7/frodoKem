@@ -2,18 +2,60 @@
     Copyright Michael Lodder. All Rights Reserved.
     SPDX-License-Identifier: Apache-2.0
 */
-use crate::{Expanded, Kem, Params, Sample};
+use crate::{Error, Expanded, FrodoResult, Kem, Params, Sample};
 use serde::{Deserialize, Serialize};
 use std::marker::PhantomData;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 /// A FrodoKEM ciphertext
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
 pub struct Ciphertext<P: Params>(pub(crate) Vec<u8>, pub(crate) PhantomData<P>);
 
+impl<P: Params> AsRef<[u8]> for Ciphertext<P> {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+impl<P: Params> Default for Ciphertext<P> {
+    fn default() -> Self {
+        Self(vec![0u8; P::CIPHERTEXT_LENGTH], PhantomData)
+    }
+}
+
+impl<P: Params> Ciphertext<P> {
+    pub fn from_slice(bytes: &[u8]) -> FrodoResult<Self> {
+        if bytes.len() != P::CIPHERTEXT_LENGTH {
+            return Err(Error::InvalidCiphertextLength(bytes.len()));
+        }
+        Ok(Self(bytes.to_vec(), PhantomData))
+    }
+    pub(crate) fn c1(&self) -> &[u8] {
+        &self.0[..P::LOG_Q_X_N_X_N_BAR_DIV_8]
+    }
+
+    pub(crate) fn c1_mut(&mut self) -> &mut [u8] {
+        &mut self.0[..P::LOG_Q_X_N_X_N_BAR_DIV_8]
+    }
+
+    pub(crate) fn c2(&self) -> &[u8] {
+        &self.0[P::LOG_Q_X_N_X_N_BAR_DIV_8..]
+    }
+
+    pub(crate) fn c2_mut(&mut self) -> &mut [u8] {
+        &mut self.0[P::LOG_Q_X_N_X_N_BAR_DIV_8..]
+    }
+}
+
 /// A FrodoKEM public key
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
 pub struct PublicKey<P: Params>(pub(crate) Vec<u8>, pub(crate) PhantomData<P>);
+
+impl<P: Params> AsRef<[u8]> for PublicKey<P> {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
 
 impl<P: Params> Default for PublicKey<P> {
     fn default() -> Self {
@@ -21,7 +63,20 @@ impl<P: Params> Default for PublicKey<P> {
     }
 }
 
+impl<P: Params> From<&SecretKey<P>> for PublicKey<P> {
+    fn from(value: &SecretKey<P>) -> Self {
+        Self(value.public_key().to_vec(), PhantomData)
+    }
+}
+
 impl<P: Params> PublicKey<P> {
+    pub fn from_slice(bytes: &[u8]) -> FrodoResult<Self> {
+        if bytes.len() != P::PUBLIC_KEY_LENGTH {
+            return Err(Error::InvalidPublicKeyLength(bytes.len()));
+        }
+        Ok(Self(bytes.to_vec(), PhantomData))
+    }
+
     pub(crate) fn seed_a(&self) -> &[u8] {
         &self.0[..P::BYTES_SEED_A]
     }
@@ -39,9 +94,40 @@ impl<P: Params> PublicKey<P> {
     }
 }
 
+pub(crate) struct PublicKeyRef<'a, P: Params>(pub(crate) &'a [u8], pub(crate) PhantomData<P>);
+
+impl<'a, P: Params> AsRef<[u8]> for PublicKeyRef<'a, P> {
+    fn as_ref(&self) -> &[u8] {
+        self.0
+    }
+}
+
+impl<'a, P: Params> PublicKeyRef<'a, P> {
+    pub fn from_slice(bytes: &'a [u8]) -> FrodoResult<Self> {
+        if bytes.len() != P::PUBLIC_KEY_LENGTH {
+            return Err(Error::InvalidPublicKeyLength(bytes.len()));
+        }
+        Ok(Self(bytes, PhantomData))
+    }
+
+    pub(crate) fn seed_a(&self) -> &[u8] {
+        &self.0[..P::BYTES_SEED_A]
+    }
+
+    pub(crate) fn matrix_b(&self) -> &[u8] {
+        &self.0[P::BYTES_SEED_A..]
+    }
+}
+
 /// A FrodoKEM secret key
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
 pub struct SecretKey<P: Params>(pub(crate) Vec<u8>, pub(crate) PhantomData<P>);
+
+impl<P: Params> AsRef<[u8]> for SecretKey<P> {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
 
 impl<P: Params> Default for SecretKey<P> {
     fn default() -> Self {
@@ -58,6 +144,13 @@ impl<P: Params> Zeroize for SecretKey<P> {
 impl<P: Params> ZeroizeOnDrop for SecretKey<P> {}
 
 impl<P: Params> SecretKey<P> {
+    pub fn from_slice(bytes: &[u8]) -> FrodoResult<Self> {
+        if bytes.len() != P::SECRET_KEY_LENGTH {
+            return Err(Error::InvalidSecretKeyLength(bytes.len()));
+        }
+        Ok(Self(bytes.to_vec(), PhantomData))
+    }
+
     pub fn random_s(&self) -> &[u8] {
         &self.0[..P::SHARED_SECRET_LENGTH]
     }
@@ -94,8 +187,14 @@ impl<P: Params> SecretKey<P> {
 }
 
 /// A FrodoKEM shared secret
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
 pub struct SharedSecret<P: Params>(pub(crate) Vec<u8>, pub(crate) PhantomData<P>);
+
+impl<P: Params> AsRef<[u8]> for SharedSecret<P> {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
 
 impl<P: Params> Default for SharedSecret<P> {
     fn default() -> Self {
@@ -111,6 +210,15 @@ impl<P: Params> Zeroize for SharedSecret<P> {
 
 impl<P: Params> ZeroizeOnDrop for SharedSecret<P> {}
 
+impl<P: Params> SharedSecret<P> {
+    pub fn from_slice(bytes: &[u8]) -> FrodoResult<Self> {
+        if bytes.len() != P::SHARED_SECRET_LENGTH {
+            return Err(Error::InvalidSharedSecretLength(bytes.len()));
+        }
+        Ok(Self(bytes.to_vec(), PhantomData))
+    }
+}
+
 #[derive(
     Copy, Clone, Default, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Deserialize, Serialize,
 )]
@@ -119,10 +227,8 @@ pub struct FrodoKem<P: Params, E: Expanded, S: Sample>(pub PhantomData<(P, E, S)
 impl<P: Params, E: Expanded, S: Sample> Params for FrodoKem<P, E, S> {
     type Shake = P::Shake;
     const N: usize = P::N;
-    const N_BAR: usize = P::N_BAR;
     const LOG_Q: usize = P::LOG_Q;
     const EXTRACTED_BITS: usize = P::EXTRACTED_BITS;
-    const BYTES_SEED_A: usize = P::BYTES_SEED_A;
     const CDF_TABLE: &'static [u16] = P::CDF_TABLE;
     const CLAIMED_NIST_LEVEL: usize = P::CLAIMED_NIST_LEVEL;
     const SHARED_SECRET_LENGTH: usize = P::SHARED_SECRET_LENGTH;
@@ -153,15 +259,49 @@ pub struct Frodo640;
 impl Params for Frodo640 {
     type Shake = sha3::Shake128;
     const N: usize = 640;
-    const N_BAR: usize = 8;
     const LOG_Q: usize = 15;
     const EXTRACTED_BITS: usize = 2;
-    const BYTES_SEED_A: usize = 16;
     const CDF_TABLE: &'static [u16] = &[
         4643, 13363, 20579, 25843, 29227, 31145, 32103, 32525, 32689, 32745, 32762, 32766, 32767,
     ];
     const CLAIMED_NIST_LEVEL: usize = 1;
     const SHARED_SECRET_LENGTH: usize = 16;
+}
+
+#[cfg(any(feature = "frodo976aes", feature = "frodo976shake"))]
+#[derive(
+    Copy, Clone, Default, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Deserialize, Serialize,
+)]
+pub struct Frodo976;
+
+#[cfg(any(feature = "frodo976aes", feature = "frodo976shake"))]
+impl Params for Frodo976 {
+    type Shake = sha3::Shake256;
+    const N: usize = 976;
+    const LOG_Q: usize = 16;
+    const EXTRACTED_BITS: usize = 3;
+    const CDF_TABLE: &'static [u16] = &[
+        5638, 15915, 23689, 28571, 31116, 32217, 32613, 32731, 32760, 32766, 32767,
+    ];
+    const CLAIMED_NIST_LEVEL: usize = 3;
+    const SHARED_SECRET_LENGTH: usize = 24;
+}
+
+#[cfg(any(feature = "frodo1344aes", feature = "frodo1344shake"))]
+#[derive(
+    Copy, Clone, Default, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Deserialize, Serialize,
+)]
+pub struct Frodo1344;
+
+#[cfg(any(feature = "frodo1344aes", feature = "frodo1344shake"))]
+impl Params for Frodo1344 {
+    type Shake = sha3::Shake256;
+    const N: usize = 1344;
+    const LOG_Q: usize = 16;
+    const EXTRACTED_BITS: usize = 4;
+    const CDF_TABLE: &'static [u16] = &[9142, 23462, 30338, 32361, 32725, 32765, 32767];
+    const CLAIMED_NIST_LEVEL: usize = 5;
+    const SHARED_SECRET_LENGTH: usize = 32;
 }
 
 #[cfg(any(
@@ -233,14 +373,17 @@ pub struct FrodoShake<P: Params>(pub PhantomData<P>);
 impl<P: Params> Expanded for FrodoShake<P> {
     const METHOD: &'static str = "SHAKE";
     fn expand_a(seed_a: &[u8], a: &mut [u16]) {
-        use sha3::digest::{ExtendableOutputReset, Update};
+        use sha3::{
+            digest::{ExtendableOutputReset, Update},
+            Shake128,
+        };
 
         debug_assert_eq!(a.len(), P::N_X_N);
         debug_assert_eq!(seed_a.len(), P::BYTES_SEED_A);
 
         let mut a_row = vec![0u8; P::TWO_N];
         let mut seed_separated = vec![0u8; P::TWO_PLUS_BYTES_SEED_A];
-        let mut shake = P::Shake::default();
+        let mut shake = Shake128::default();
 
         seed_separated[2..].copy_from_slice(seed_a);
 

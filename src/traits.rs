@@ -5,9 +5,11 @@
 
 use rand_core::CryptoRngCore;
 use sha3::digest::{ExtendableOutput, ExtendableOutputReset, Update, XofReader};
+use subtle::{Choice, ConditionallySelectable};
 use zeroize::Zeroize;
 
-use crate::{PublicKey, SecretKey};
+use crate::models::PublicKeyRef;
+use crate::{Ciphertext, PublicKey, SecretKey, SharedSecret};
 
 /// The FrodoKEM parameters
 pub trait Params: Sized {
@@ -16,12 +18,12 @@ pub trait Params: Sized {
     /// The number of elements in the ring
     const N: usize;
     /// The number of rows in the matrix
-    const N_BAR: usize;
+    const N_BAR: usize = 8;
     const LOG_Q: usize;
     const EXTRACTED_BITS: usize;
     const STRIPE_STEP: usize = 8;
     const PARALLEL: usize = 4;
-    const BYTES_SEED_A: usize;
+    const BYTES_SEED_A: usize = 16;
     const BYTES_PK_HASH: usize = Self::SHARED_SECRET_LENGTH;
     const CDF_TABLE: &'static [u16];
     const CLAIMED_NIST_LEVEL: usize;
@@ -41,9 +43,10 @@ pub trait Params: Sized {
     const SHIFT: usize = Self::LOG_Q - Self::EXTRACTED_BITS;
     const Q: usize = 1 << Self::LOG_Q;
     /// The mask for the modulus
-    const Q_MASK: u16 = Self::Q as u16 - 1;
+    const Q_MASK: u16 = (Self::Q - 1) as u16;
+    const LOG_Q_X_N_X_N_BAR_DIV_8: usize = (Self::LOG_Q * Self::N_X_N_BAR) / 8;
     /// The public key length
-    const PUBLIC_KEY_LENGTH: usize = (Self::LOG_Q * Self::N_X_N_BAR) / 8 + Self::BYTES_SEED_A;
+    const PUBLIC_KEY_LENGTH: usize = Self::LOG_Q_X_N_X_N_BAR_DIV_8 + Self::BYTES_SEED_A;
     /// The secret key length
     const SECRET_KEY_LENGTH: usize = Self::PUBLIC_KEY_LENGTH
         + Self::TWO_N_X_N_BAR
@@ -51,7 +54,7 @@ pub trait Params: Sized {
         + Self::SHARED_SECRET_LENGTH;
     /// The ciphertext length
     const CIPHERTEXT_LENGTH: usize =
-        (Self::LOG_Q * Self::N_X_N_BAR) / 8 + (Self::LOG_Q * Self::N_BAR_X_N_BAR) / 8;
+        Self::LOG_Q_X_N_X_N_BAR_DIV_8 + (Self::LOG_Q * Self::N_BAR_X_N_BAR) / 8;
 }
 
 pub trait Sample {
@@ -140,6 +143,173 @@ pub trait Kem: Params + Expanded + Sample {
         (pk, sk)
     }
 
+    fn encapsulate(
+        &self,
+        public_key: &PublicKey<Self>,
+        mut rng: impl CryptoRngCore,
+    ) -> (Ciphertext<Self>, SharedSecret<Self>) {
+        let mut ct = Ciphertext::default();
+        let mut ss = SharedSecret::default();
+
+        let mut shake = Self::Shake::default();
+        let mut g2_in = vec![0u8; Self::BYTES_PK_HASH + Self::BYTES_MU];
+
+        shake.update(&public_key.0);
+        shake.finalize_xof_reset_into(&mut g2_in[..Self::BYTES_PK_HASH]);
+        rng.fill_bytes(&mut g2_in[Self::BYTES_PK_HASH..]);
+        let mut g2_out = vec![0u8; 2 * Self::SHARED_SECRET_LENGTH];
+        shake.update(&g2_in);
+        shake.finalize_xof_reset_into(&mut g2_out);
+
+        let mut sp = vec![0u16; (2 * Self::N + Self::N_BAR) * Self::N_BAR];
+        shake.update(&[0x96]);
+        shake.update(&g2_out[..Self::SHARED_SECRET_LENGTH]);
+        let mut shake_reader = shake.finalize_xof_reset();
+        let mut u16_buffer = [0u8; 2];
+        for b in sp.iter_mut() {
+            shake_reader.read(&mut u16_buffer);
+            *b = u16::from_le_bytes(u16_buffer);
+        }
+
+        Self::sample(&mut sp[..Self::N_X_N_BAR]);
+        Self::sample(&mut sp[Self::N_X_N_BAR..2 * Self::N_X_N_BAR]);
+        Self::sample(&mut sp[2 * Self::N_X_N_BAR..]);
+
+        let s = &sp[..Self::N_X_N_BAR];
+        let ep = &sp[Self::N_X_N_BAR..2 * Self::N_X_N_BAR];
+        let epp = &sp[2 * Self::N_X_N_BAR..];
+
+        let mut matrix_a = vec![0u16; Self::N_X_N];
+        Self::expand_a(public_key.seed_a(), &mut matrix_a);
+
+        let mut matrix_b = vec![0u16; Self::N_X_N_BAR];
+        self.mul_add_sa_plus_e(&s, &matrix_a, &ep, &mut matrix_b);
+
+        self.pack(&matrix_b, ct.c1_mut());
+        let mut pk_matrix_b = vec![0u16; Self::N_X_N_BAR];
+        self.unpack(public_key.matrix_b(), &mut pk_matrix_b);
+
+        let mut matrix_v = vec![0u16; Self::N_BAR_X_N_BAR];
+        self.mul_add_sb_plus_e(&s, &pk_matrix_b, &epp, &mut matrix_v);
+
+        let mut matrix_c = vec![0u16; Self::N_BAR_X_N_BAR];
+
+        self.encode_message(&g2_in[Self::BYTES_PK_HASH..], &mut matrix_c);
+        self.add(&matrix_v, &mut matrix_c);
+        self.pack(&matrix_c, ct.c2_mut());
+
+        shake.update(&ct.0);
+        shake.update(&g2_out[Self::SHARED_SECRET_LENGTH..]);
+        shake.finalize_xof_into(&mut ss.0);
+
+        matrix_v.zeroize();
+        sp.zeroize();
+        g2_in[Self::BYTES_PK_HASH..].zeroize();
+        g2_out.zeroize();
+
+        (ct, ss)
+    }
+
+    fn decapsulate(
+        &self,
+        ciphertext: &Ciphertext<Self>,
+        secret_key: &SecretKey<Self>,
+    ) -> SharedSecret<Self> {
+        let mut ss = SharedSecret::default();
+        let mut matrix_s = vec![0u16; Self::N_X_N_BAR];
+        let pk =
+            PublicKeyRef::<Self>::from_slice(secret_key.public_key()).expect("Invalid public key");
+
+        for (i, b) in matrix_s.iter_mut().enumerate() {
+            let bb = [
+                secret_key.matrix_s()[i * 2],
+                secret_key.matrix_s()[i * 2 + 1],
+            ];
+            *b = u16::from_le_bytes(bb);
+        }
+
+        let mut matrix_bp = vec![0u16; Self::N_X_N_BAR];
+        self.unpack(ciphertext.c1(), &mut matrix_bp);
+
+        let mut matrix_c = vec![0u16; Self::N_BAR_X_N_BAR];
+        self.unpack(ciphertext.c2(), &mut matrix_c);
+
+        // W = C - Bp*S mod q
+        let mut matrix_w = vec![0u16; Self::N_BAR_X_N_BAR];
+        self.mul_bs(&matrix_bp, &matrix_s, &mut matrix_w);
+        self.sub(&matrix_c, &mut matrix_w);
+
+        let mut g2_in = vec![0u8; Self::BYTES_PK_HASH + Self::BYTES_MU];
+        let mut g2_out = vec![0u8; 2 * Self::SHARED_SECRET_LENGTH];
+
+        g2_in[..Self::BYTES_PK_HASH].copy_from_slice(secret_key.hpk());
+        // µ'
+        self.decode_message(&matrix_w, &mut g2_in[Self::BYTES_PK_HASH..]);
+
+        let mut shake = Self::Shake::default();
+        shake.update(&g2_in);
+        shake.finalize_xof_reset_into(&mut g2_out);
+
+        let mut sp = vec![0u16; (2 * Self::N + Self::N_BAR) * Self::N_BAR];
+        shake.update(&[0x96]);
+        shake.update(&g2_out[..Self::SHARED_SECRET_LENGTH]);
+        let mut shake_reader = shake.finalize_xof_reset();
+        let mut u16_buffer = [0u8; 2];
+        for b in sp.iter_mut() {
+            shake_reader.read(&mut u16_buffer);
+            *b = u16::from_le_bytes(u16_buffer);
+        }
+
+        Self::sample(&mut sp[..Self::N_X_N_BAR]);
+        Self::sample(&mut sp[Self::N_X_N_BAR..2 * Self::N_X_N_BAR]);
+        Self::sample(&mut sp[2 * Self::N_X_N_BAR..]);
+
+        let s = &sp[..Self::N_X_N_BAR];
+        let ep = &sp[Self::N_X_N_BAR..2 * Self::N_X_N_BAR];
+        let epp = &sp[2 * Self::N_X_N_BAR..];
+
+        let mut matrix_a = vec![0u16; Self::N_X_N];
+        Self::expand_a(&pk.seed_a(), &mut matrix_a);
+
+        let mut matrix_bpp = vec![0u16; Self::N_X_N_BAR];
+        self.mul_add_sa_plus_e(&s, &matrix_a, &ep, &mut matrix_bpp);
+        // BB mod q
+        matrix_bpp.iter_mut().for_each(|b| *b &= Self::Q_MASK);
+
+        let mut matrix_b = vec![0u16; Self::N_X_N_BAR];
+        self.unpack(&pk.matrix_b(), &mut matrix_b);
+
+        // W = Sp*B + Epp
+        self.mul_add_sb_plus_e(&s, &matrix_b, &epp, &mut matrix_w);
+
+        // CC = W + enc(µ') mod q
+        let mut matrix_cc = vec![0u16; Self::N_BAR_X_N_BAR];
+        self.encode_message(&g2_in[Self::BYTES_PK_HASH..], &mut matrix_cc);
+        self.add(&matrix_w, &mut matrix_cc);
+
+        shake.update(&ciphertext.0);
+        // If (Bp == BBp & C == CC) then ss = F(ct || k'), else ss = F(ct || s)
+        // Needs to avoid branching on secret data as per:
+        //     Qian Guo, Thomas Johansson, Alexander Nilsson. A key-recovery timing attack on post-quantum
+        //     primitives using the Fujisaki-Okamoto transformation and its application on FrodoKEM. In CRYPTO 2020.
+        let choice =
+            self.ct_verify(&matrix_bp, &matrix_bpp) & self.ct_verify(&matrix_c, &matrix_cc);
+
+        let mut fin_k = vec![0u8; Self::SHARED_SECRET_LENGTH];
+        /// Take k if choice == 0, otherwise take s
+        self.ct_select(
+            choice,
+            &g2_out[Self::SHARED_SECRET_LENGTH..],
+            secret_key.random_s(),
+            &mut fin_k,
+        );
+
+        shake.update(&fin_k);
+        shake.finalize_xof_into(&mut ss.0);
+
+        ss
+    }
+
     fn mul_add_as_plus_e(&self, a: &[u16], s: &[u16], e: &[u16], b: &mut [u16]) {
         debug_assert_eq!(a.len(), Self::N_X_N);
         debug_assert_eq!(s.len(), Self::N_X_N_BAR);
@@ -194,7 +364,7 @@ pub trait Kem: Params + Expanded + Sample {
                 for j in 0..Self::N {
                     sum = sum.wrapping_add(s[k_n + j].wrapping_mul(b[j * Self::N_BAR + i]));
                 }
-                out[k_bar + i] &= Self::Q_MASK;
+                out[k_bar + i] = sum & Self::Q_MASK;
             }
         }
     }
@@ -217,23 +387,19 @@ pub trait Kem: Params + Expanded + Sample {
         }
     }
 
-    fn add(&self, lhs: &[u16], rhs: &[u16], out: &mut [u16]) {
-        debug_assert_eq!(lhs.len(), Self::N_BAR_X_N_BAR);
+    fn add(&self, rhs: &[u16], out: &mut [u16]) {
         debug_assert_eq!(rhs.len(), Self::N_BAR_X_N_BAR);
         debug_assert_eq!(out.len(), Self::N_BAR_X_N_BAR);
         for i in 0..Self::N_BAR_X_N_BAR {
-            out[i] = lhs[i].wrapping_add(rhs[i]);
-            out[i] &= Self::Q_MASK;
+            out[i] = out[i].wrapping_add(rhs[i]) & Self::Q_MASK;
         }
     }
 
-    fn sub(&self, lhs: &[u16], rhs: &[u16], out: &mut [u16]) {
+    fn sub(&self, lhs: &[u16], out: &mut [u16]) {
         debug_assert_eq!(lhs.len(), Self::N_BAR_X_N_BAR);
-        debug_assert_eq!(rhs.len(), Self::N_BAR_X_N_BAR);
         debug_assert_eq!(out.len(), Self::N_BAR_X_N_BAR);
         for i in 0..Self::N_BAR_X_N_BAR {
-            out[i] = lhs[i].wrapping_sub(rhs[i]);
-            out[i] &= Self::Q_MASK;
+            out[i] = lhs[i].wrapping_sub(out[i]) & Self::Q_MASK;
         }
     }
 
@@ -366,6 +532,23 @@ pub trait Kem: Params + Expanded + Sample {
             j += 8;
             i += 1;
             ii = i * 15;
+        }
+    }
+
+    fn ct_verify(&self, a: &[u16], b: &[u16]) -> Choice {
+        let mut choice = 0;
+
+        for i in 0..a.len() {
+            choice |= a[i] ^ b[i];
+        }
+
+        choice = ((choice | choice.wrapping_neg()) >> 15) + 1;
+        Choice::from(choice as u8)
+    }
+
+    fn ct_select(&self, choice: Choice, a: &[u8], b: &[u8], out: &mut [u8]) {
+        for i in 0..a.len() {
+            out[i] = u8::conditional_select(&b[i], &a[i], choice);
         }
     }
 }
