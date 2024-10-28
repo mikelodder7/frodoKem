@@ -19,6 +19,12 @@ pub enum Error {
     /// The shared secret length is invalid
     #[error("Invalid shared secret length: {0}")]
     InvalidSharedSecretLength(usize),
+    /// The message length is invalid
+    #[error("Invalid message length: {0}")]
+    InvalidMessageLength(usize),
+    /// Parsing string to algorithm
+    #[error("Unsupported algorithm")]
+    UnsupportedAlgorithm,
 }
 
 /// The result type for FrodoKEM

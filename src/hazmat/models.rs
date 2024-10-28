@@ -2,13 +2,50 @@
     Copyright Michael Lodder. All Rights Reserved.
     SPDX-License-Identifier: Apache-2.0
 */
-use crate::{Error, Expanded, FrodoResult, Kem, Params, Sample};
-use serde::{Deserialize, Serialize};
+use super::{Expanded, Kem, Params, Sample};
+use crate::{Error, FrodoResult};
 use std::marker::PhantomData;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
+macro_rules! from_slice_impl {
+    ($name:ident) => {
+        impl<P: Params> TryFrom<&[u8]> for $name<P> {
+            type Error = Error;
+
+            fn try_from(bytes: &[u8]) -> FrodoResult<Self> {
+                Self::from_slice(bytes)
+            }
+        }
+
+        impl<P: Params> TryFrom<Box<[u8]>> for $name<P> {
+            type Error = Error;
+
+            fn try_from(bytes: Box<[u8]>) -> FrodoResult<Self> {
+                Self::from_slice(bytes.as_ref())
+            }
+        }
+
+        impl<P: Params> TryFrom<Vec<u8>> for $name<P> {
+            type Error = Error;
+
+            fn try_from(bytes: Vec<u8>) -> FrodoResult<Self> {
+                Self::from_slice(bytes.as_ref())
+            }
+        }
+
+        impl<P: Params> TryFrom<&Vec<u8>> for $name<P> {
+            type Error = Error;
+
+            fn try_from(bytes: &Vec<u8>) -> FrodoResult<Self> {
+                Self::from_slice(bytes.as_ref())
+            }
+        }
+    };
+}
+
 /// A FrodoKEM ciphertext
-#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Ciphertext<P: Params>(pub(crate) Vec<u8>, pub(crate) PhantomData<P>);
 
 impl<P: Params> AsRef<[u8]> for Ciphertext<P> {
@@ -23,6 +60,8 @@ impl<P: Params> Default for Ciphertext<P> {
     }
 }
 
+from_slice_impl!(Ciphertext);
+
 impl<P: Params> Ciphertext<P> {
     /// Convert a slice of bytes into a ciphertext
     pub fn from_slice(bytes: &[u8]) -> FrodoResult<Self> {
@@ -33,6 +72,7 @@ impl<P: Params> Ciphertext<P> {
     }
 
     /// Returns a reference to the c1 component
+    #[allow(dead_code)]
     pub fn c1(&self) -> &[u8] {
         &self.0[..P::LOG_Q_X_N_X_N_BAR_DIV_8]
     }
@@ -43,6 +83,7 @@ impl<P: Params> Ciphertext<P> {
     }
 
     /// Returns a reference to the c2 component
+    #[allow(dead_code)]
     pub fn c2(&self) -> &[u8] {
         &self.0[P::LOG_Q_X_N_X_N_BAR_DIV_8..]
     }
@@ -53,8 +94,52 @@ impl<P: Params> Ciphertext<P> {
     }
 }
 
+/// A FrodoKEM ciphertext reference
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub struct CiphertextRef<'a, P: Params>(pub(crate) &'a [u8], pub(crate) PhantomData<P>);
+
+impl<'a, P: Params> AsRef<[u8]> for CiphertextRef<'a, P> {
+    fn as_ref(&self) -> &[u8] {
+        self.0
+    }
+}
+
+impl<'a, P: Params> From<&'a Ciphertext<P>> for CiphertextRef<'a, P> {
+    fn from(value: &'a Ciphertext<P>) -> Self {
+        Self(value.0.as_slice(), value.1)
+    }
+}
+
+impl<'a, P: Params> CiphertextRef<'a, P> {
+    /// Create a ciphertext reference
+    #[allow(dead_code)]
+    pub fn from_slice(bytes: &'a [u8]) -> FrodoResult<Self> {
+        if bytes.len() != P::CIPHERTEXT_LENGTH {
+            return Err(Error::InvalidCiphertextLength(bytes.len()));
+        }
+        Ok(Self(bytes, PhantomData))
+    }
+
+    /// Returns a reference to the c1 component
+    pub fn c1(&self) -> &[u8] {
+        &self.0[..P::LOG_Q_X_N_X_N_BAR_DIV_8]
+    }
+
+    /// Returns a reference to the c2 component
+    pub fn c2(&self) -> &[u8] {
+        &self.0[P::LOG_Q_X_N_X_N_BAR_DIV_8..]
+    }
+
+    /// Convert the ciphertext reference into an owned ciphertext
+    #[allow(dead_code)]
+    pub fn to_owned(&self) -> Ciphertext<P> {
+        Ciphertext(self.0.to_vec(), PhantomData)
+    }
+}
+
 /// A FrodoKEM public key
-#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct PublicKey<P: Params>(pub(crate) Vec<u8>, pub(crate) PhantomData<P>);
 
 impl<P: Params> AsRef<[u8]> for PublicKey<P> {
@@ -74,6 +159,14 @@ impl<P: Params> From<&SecretKey<P>> for PublicKey<P> {
         Self(value.public_key().to_vec(), PhantomData)
     }
 }
+
+impl<'a, P: Params> From<&'a PublicKey<P>> for PublicKeyRef<'a, P> {
+    fn from(value: &'a PublicKey<P>) -> Self {
+        Self(value.0.as_slice(), value.1)
+    }
+}
+
+from_slice_impl!(PublicKey);
 
 impl<P: Params> PublicKey<P> {
     /// Convert a slice of bytes into a public key
@@ -95,6 +188,7 @@ impl<P: Params> PublicKey<P> {
     }
 
     /// Returns a reference to the matrix B
+    #[allow(dead_code)]
     pub fn matrix_b(&self) -> &[u8] {
         &self.0[P::BYTES_SEED_A..]
     }
@@ -105,15 +199,11 @@ impl<P: Params> PublicKey<P> {
     }
 }
 
-pub(crate) struct PublicKeyRef<'a, P: Params>(pub(crate) &'a [u8], pub(crate) PhantomData<P>);
-
-impl<'a, P: Params> AsRef<[u8]> for PublicKeyRef<'a, P> {
-    fn as_ref(&self) -> &[u8] {
-        self.0
-    }
-}
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub struct PublicKeyRef<'a, P: Params>(pub(crate) &'a [u8], pub(crate) PhantomData<P>);
 
 impl<'a, P: Params> PublicKeyRef<'a, P> {
+    /// Create a public key reference
     pub fn from_slice(bytes: &'a [u8]) -> FrodoResult<Self> {
         if bytes.len() != P::PUBLIC_KEY_LENGTH {
             return Err(Error::InvalidPublicKeyLength(bytes.len()));
@@ -121,17 +211,26 @@ impl<'a, P: Params> PublicKeyRef<'a, P> {
         Ok(Self(bytes, PhantomData))
     }
 
-    pub(crate) fn seed_a(&self) -> &[u8] {
+    /// Returns a reference to the seed A
+    pub fn seed_a(&self) -> &[u8] {
         &self.0[..P::BYTES_SEED_A]
     }
 
-    pub(crate) fn matrix_b(&self) -> &[u8] {
+    /// Returns a reference to the matrix B
+    pub fn matrix_b(&self) -> &[u8] {
         &self.0[P::BYTES_SEED_A..]
+    }
+
+    /// Convert the public key reference into an owned public key
+    #[allow(dead_code)]
+    pub fn to_owned(&self) -> PublicKey<P> {
+        PublicKey(self.0.to_vec(), PhantomData)
     }
 }
 
 /// A FrodoKEM secret key
-#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SecretKey<P: Params>(pub(crate) Vec<u8>, pub(crate) PhantomData<P>);
 
 impl<P: Params> AsRef<[u8]> for SecretKey<P> {
@@ -154,6 +253,8 @@ impl<P: Params> Zeroize for SecretKey<P> {
 
 impl<P: Params> ZeroizeOnDrop for SecretKey<P> {}
 
+from_slice_impl!(SecretKey);
+
 impl<P: Params> SecretKey<P> {
     /// Convert a slice of bytes into a secret key
     pub fn from_slice(bytes: &[u8]) -> FrodoResult<Self> {
@@ -164,6 +265,7 @@ impl<P: Params> SecretKey<P> {
     }
 
     /// Returns a reference to the shared secret
+    #[allow(dead_code)]
     pub fn random_s(&self) -> &[u8] {
         &self.0[..P::SHARED_SECRET_LENGTH]
     }
@@ -184,6 +286,7 @@ impl<P: Params> SecretKey<P> {
     }
 
     /// Returns a reference to the matrix s
+    #[allow(dead_code)]
     pub fn matrix_s(&self) -> &[u8] {
         &self.0[P::SHARED_SECRET_LENGTH + P::PUBLIC_KEY_LENGTH
             ..P::SHARED_SECRET_LENGTH + P::PUBLIC_KEY_LENGTH + P::TWO_N_X_N_BAR]
@@ -196,6 +299,7 @@ impl<P: Params> SecretKey<P> {
     }
 
     /// Returns a reference to the hash of the public key
+    #[allow(dead_code)]
     pub fn hpk(&self) -> &[u8] {
         &self.0[P::SHARED_SECRET_LENGTH + P::PUBLIC_KEY_LENGTH + P::TWO_N_X_N_BAR..]
     }
@@ -206,8 +310,64 @@ impl<P: Params> SecretKey<P> {
     }
 }
 
+/// A FrodoKEM secret key reference
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub struct SecretKeyRef<'a, P: Params>(pub(crate) &'a [u8], pub(crate) PhantomData<P>);
+
+impl<'a, P: Params> AsRef<[u8]> for SecretKeyRef<'a, P> {
+    fn as_ref(&self) -> &[u8] {
+        self.0
+    }
+}
+
+impl<'a, P: Params> From<&'a SecretKey<P>> for SecretKeyRef<'a, P> {
+    fn from(value: &'a SecretKey<P>) -> Self {
+        Self(value.0.as_slice(), value.1)
+    }
+}
+
+impl<'a, P: Params> SecretKeyRef<'a, P> {
+    /// Create a secret key reference
+    #[allow(dead_code)]
+    pub fn from_slice(bytes: &'a [u8]) -> FrodoResult<Self> {
+        if bytes.len() != P::SECRET_KEY_LENGTH {
+            return Err(Error::InvalidSecretKeyLength(bytes.len()));
+        }
+        Ok(Self(bytes, PhantomData))
+    }
+
+    /// Returns a reference to the shared secret
+    #[allow(dead_code)]
+    pub fn random_s(&self) -> &[u8] {
+        &self.0[..P::SHARED_SECRET_LENGTH]
+    }
+
+    /// Returns a reference to the public key
+    pub fn public_key(&self) -> &[u8] {
+        &self.0[P::SHARED_SECRET_LENGTH..P::SHARED_SECRET_LENGTH + P::PUBLIC_KEY_LENGTH]
+    }
+
+    /// Returns a reference to the matrix s
+    pub fn matrix_s(&self) -> &[u8] {
+        &self.0[P::SHARED_SECRET_LENGTH + P::PUBLIC_KEY_LENGTH
+            ..P::SHARED_SECRET_LENGTH + P::PUBLIC_KEY_LENGTH + P::TWO_N_X_N_BAR]
+    }
+
+    /// Returns a reference to the hash of the public key
+    pub fn hpk(&self) -> &[u8] {
+        &self.0[P::SHARED_SECRET_LENGTH + P::PUBLIC_KEY_LENGTH + P::TWO_N_X_N_BAR..]
+    }
+
+    /// Convert the secret key reference into an owned secret key
+    #[allow(dead_code)]
+    pub fn to_owned(&self) -> SecretKey<P> {
+        SecretKey(self.0.to_vec(), PhantomData)
+    }
+}
+
 /// A FrodoKEM shared secret
-#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SharedSecret<P: Params>(pub(crate) Vec<u8>, pub(crate) PhantomData<P>);
 
 impl<P: Params> AsRef<[u8]> for SharedSecret<P> {
@@ -230,6 +390,8 @@ impl<P: Params> Zeroize for SharedSecret<P> {
 
 impl<P: Params> ZeroizeOnDrop for SharedSecret<P> {}
 
+from_slice_impl!(SharedSecret);
+
 impl<P: Params> SharedSecret<P> {
     /// Convert a slice of bytes into a shared secret
     pub fn from_slice(bytes: &[u8]) -> FrodoResult<Self> {
@@ -240,10 +402,42 @@ impl<P: Params> SharedSecret<P> {
     }
 }
 
+/// A FrodoKEM shared secret reference
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub struct SharedSecretRef<'a, P: Params>(pub(crate) &'a [u8], pub(crate) PhantomData<P>);
+
+impl<'a, P: Params> AsRef<[u8]> for SharedSecretRef<'a, P> {
+    fn as_ref(&self) -> &[u8] {
+        self.0
+    }
+}
+
+impl<'a, P: Params> From<&'a SharedSecret<P>> for SharedSecretRef<'a, P> {
+    fn from(value: &'a SharedSecret<P>) -> Self {
+        Self(value.0.as_slice(), value.1)
+    }
+}
+
+impl<'a, P: Params> SharedSecretRef<'a, P> {
+    /// Create a shared secret reference
+    #[allow(dead_code)]
+    pub fn from_slice(bytes: &'a [u8]) -> FrodoResult<Self> {
+        if bytes.len() != P::SHARED_SECRET_LENGTH {
+            return Err(Error::InvalidSharedSecretLength(bytes.len()));
+        }
+        Ok(Self(bytes, PhantomData))
+    }
+
+    /// Convert the shared secret reference into an owned shared secret
+    #[allow(dead_code)]
+    pub fn to_owned(&self) -> SharedSecret<P> {
+        SharedSecret(self.0.to_vec(), PhantomData)
+    }
+}
+
 /// The FrodoKEM scheme
-#[derive(
-    Copy, Clone, Default, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Deserialize, Serialize,
-)]
+#[derive(Copy, Clone, Default, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct FrodoKem<P: Params, E: Expanded, S: Sample>(pub PhantomData<(P, E, S)>);
 
 impl<P: Params, E: Expanded, S: Sample> Params for FrodoKem<P, E, S> {
@@ -273,9 +467,8 @@ impl<P: Params, E: Expanded, S: Sample> Kem for FrodoKem<P, E, S> {}
 
 #[cfg(any(feature = "frodo640aes", feature = "frodo640shake"))]
 /// Frodo640 parameters
-#[derive(
-    Copy, Clone, Default, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Deserialize, Serialize,
-)]
+#[derive(Copy, Clone, Default, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Frodo640;
 
 #[cfg(any(feature = "frodo640aes", feature = "frodo640shake"))]
@@ -293,9 +486,8 @@ impl Params for Frodo640 {
 
 #[cfg(any(feature = "frodo976aes", feature = "frodo976shake"))]
 /// Frodo976 parameters
-#[derive(
-    Copy, Clone, Default, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Deserialize, Serialize,
-)]
+#[derive(Copy, Clone, Default, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Frodo976;
 
 #[cfg(any(feature = "frodo976aes", feature = "frodo976shake"))]
@@ -313,9 +505,8 @@ impl Params for Frodo976 {
 
 #[cfg(any(feature = "frodo1344aes", feature = "frodo1344shake"))]
 /// Frodo1344 parameters
-#[derive(
-    Copy, Clone, Default, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Deserialize, Serialize,
-)]
+#[derive(Copy, Clone, Default, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Frodo1344;
 
 #[cfg(any(feature = "frodo1344aes", feature = "frodo1344shake"))]
@@ -337,13 +528,12 @@ impl Params for Frodo1344 {
 /// Generate matrix A (N x N) column-wise using AES-128
 ///
 /// See Algorithm 7 in the [spec](https://frodokem.org/files/FrodoKEM-specification-20190215.pdf)
-#[derive(
-    Copy, Clone, Default, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Deserialize, Serialize,
-)]
+#[derive(Copy, Clone, Default, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct FrodoAes<P: Params>(pub(crate) PhantomData<P>);
 
 impl<P: Params> Expanded for FrodoAes<P> {
-    const METHOD: &'static str = "Aes";
+    const METHOD: &'static str = "AES";
 
     fn expand_a(seed_a: &[u8], a: &mut [u16]) {
         use aes::{
@@ -385,9 +575,8 @@ impl<P: Params> Expanded for FrodoAes<P> {
 /// Generate matrix A (N x N) column-wise using SHAKE-128
 ///
 /// See Algorithm 8 in the [spec](https://frodokem.org/files/FrodoKEM-specification-20190215.pdf)
-#[derive(
-    Copy, Clone, Default, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Deserialize, Serialize,
-)]
+#[derive(Copy, Clone, Default, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct FrodoShake<P: Params>(pub PhantomData<P>);
 
 #[cfg(any(
@@ -427,9 +616,8 @@ impl<P: Params> Expanded for FrodoShake<P> {
 }
 
 /// Generate sample noise using a CDF
-#[derive(
-    Copy, Clone, Default, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Deserialize, Serialize,
-)]
+#[derive(Copy, Clone, Default, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct FrodoCdfSample<P: Params>(pub PhantomData<P>);
 
 impl<P: Params> Sample for FrodoCdfSample<P> {

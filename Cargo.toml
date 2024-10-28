@@ -14,6 +14,7 @@ version = "0.1.0"
 
 [features]
 default = ["frodo640aes", "frodo640shake", "frodo976aes", "frodo976shake", "frodo1344aes", "frodo1344shake"]
+hazmat = []
 experimental = []
 frodo640aes = ["aes"]
 frodo640shake = []
@@ -21,11 +22,12 @@ frodo976aes = ["aes"]
 frodo976shake = []
 frodo1344aes = ["aes"]
 frodo1344shake = []
+serde = ["dep:serde"]
 
 [dependencies]
 aes = { version = "0.8", optional = true }
 rand_core = { version = "0.6", features = ["std"] }
-serde = { version = "1.0", features = ["derive"] }
+serde = { version = "1.0", features = ["derive"], optional = true }
 subtle = "2.6"
 sha3 = { version = "0.10" }
 thiserror = "1.0"

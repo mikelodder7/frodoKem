@@ -8,8 +8,9 @@ use sha3::digest::{ExtendableOutput, ExtendableOutputReset, Update, XofReader};
 use subtle::{Choice, ConditionallySelectable};
 use zeroize::Zeroize;
 
-use crate::models::PublicKeyRef;
-use crate::{Ciphertext, PublicKey, SecretKey, SharedSecret};
+use super::{
+    Ciphertext, CiphertextRef, PublicKey, PublicKeyRef, SecretKey, SecretKeyRef, SharedSecret,
+};
 
 /// The FrodoKEM parameters
 pub trait Params: Sized {
@@ -172,23 +173,39 @@ pub trait Kem: Params + Expanded + Sample {
         (pk, sk)
     }
 
+    /// Encapsulate a random message into a ciphertext.
+    ///
+    /// See Algorithm 10 in the [spec](https://frodokem.org/files/FrodoKEM-specification-20210604.pdf).
+    fn encapsulate_with_rng(
+        &self,
+        public_key: PublicKeyRef<'_, Self>,
+        mut rng: impl CryptoRngCore,
+    ) -> (Ciphertext<Self>, SharedSecret<Self>) {
+        let mut mu = vec![0u8; Self::BYTES_MU];
+        rng.fill_bytes(&mut mu);
+        let res = self.encapsulate(public_key, &mu);
+        mu.zeroize();
+        res
+    }
+
     /// Encapsulate a message into a ciphertext.
     ///
     /// See Algorithm 10 in the [spec](https://frodokem.org/files/FrodoKEM-specification-20210604.pdf).
     fn encapsulate(
         &self,
-        public_key: &PublicKey<Self>,
-        mut rng: impl CryptoRngCore,
+        public_key: PublicKeyRef<'_, Self>,
+        mu: &[u8],
     ) -> (Ciphertext<Self>, SharedSecret<Self>) {
+        assert_eq!(mu.len(), Self::BYTES_MU);
         let mut ct = Ciphertext::default();
         let mut ss = SharedSecret::default();
 
         let mut shake = Self::Shake::default();
         let mut g2_in = vec![0u8; Self::BYTES_PK_HASH + Self::BYTES_MU];
 
-        shake.update(&public_key.0);
+        shake.update(public_key.0);
         shake.finalize_xof_reset_into(&mut g2_in[..Self::BYTES_PK_HASH]);
-        rng.fill_bytes(&mut g2_in[Self::BYTES_PK_HASH..]);
+        g2_in[Self::BYTES_PK_HASH..].copy_from_slice(mu);
         let mut g2_out = vec![0u8; 2 * Self::SHARED_SECRET_LENGTH];
         shake.update(&g2_in);
         shake.finalize_xof_reset_into(&mut g2_out);
@@ -248,9 +265,9 @@ pub trait Kem: Params + Expanded + Sample {
     /// See Algorithm 11 in the [spec](https://frodokem.org/files/FrodoKEM-specification-20210604.pdf).
     fn decapsulate(
         &self,
-        ciphertext: &Ciphertext<Self>,
-        secret_key: &SecretKey<Self>,
-    ) -> SharedSecret<Self> {
+        secret_key: SecretKeyRef<'_, Self>,
+        ciphertext: CiphertextRef<'_, Self>,
+    ) -> (SharedSecret<Self>, Vec<u8>) {
         let mut ss = SharedSecret::default();
         let mut matrix_s = vec![0u16; Self::N_X_N_BAR];
         let pk =
@@ -321,7 +338,7 @@ pub trait Kem: Params + Expanded + Sample {
         self.encode_message(&g2_in[Self::BYTES_PK_HASH..], &mut matrix_cc);
         self.add(&matrix_w, &mut matrix_cc);
 
-        shake.update(&ciphertext.0);
+        shake.update(ciphertext.0);
         // If (Bp == BBp & C == CC) then ss = F(ct || k'), else ss = F(ct || s)
         // Needs to avoid branching on secret data as per:
         //     Qian Guo, Thomas Johansson, Alexander Nilsson. A key-recovery timing attack on post-quantum
@@ -341,7 +358,7 @@ pub trait Kem: Params + Expanded + Sample {
         shake.update(&fin_k);
         shake.finalize_xof_into(&mut ss.0);
 
-        ss
+        (ss, g2_in[Self::BYTES_PK_HASH..].to_vec())
     }
 
     /// Multiply by s on the right.
