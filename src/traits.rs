@@ -107,8 +107,7 @@ pub trait Kem: Params + Expanded + Sample {
             *b = u16::from_le_bytes(u16_buffer);
         }
 
-        Self::sample(&mut bytes_se[..Self::N_X_N_BAR]);
-        Self::sample(&mut bytes_se[Self::N_X_N_BAR..]);
+        Self::sample(&mut bytes_se);
 
         let mut a_matrix = vec![0u16; Self::N_X_N];
         Self::expand_a(pk.seed_a(), &mut a_matrix);
@@ -171,9 +170,7 @@ pub trait Kem: Params + Expanded + Sample {
             *b = u16::from_le_bytes(u16_buffer);
         }
 
-        Self::sample(&mut sp[..Self::N_X_N_BAR]);
-        Self::sample(&mut sp[Self::N_X_N_BAR..2 * Self::N_X_N_BAR]);
-        Self::sample(&mut sp[2 * Self::N_X_N_BAR..]);
+        Self::sample(&mut sp);
 
         let s = &sp[..Self::N_X_N_BAR];
         let ep = &sp[Self::N_X_N_BAR..2 * Self::N_X_N_BAR];
@@ -186,6 +183,7 @@ pub trait Kem: Params + Expanded + Sample {
         self.mul_add_sa_plus_e(&s, &matrix_a, &ep, &mut matrix_b);
 
         self.pack(&matrix_b, ct.c1_mut());
+
         let mut pk_matrix_b = vec![0u16; Self::N_X_N_BAR];
         self.unpack(public_key.matrix_b(), &mut pk_matrix_b);
 
@@ -195,7 +193,9 @@ pub trait Kem: Params + Expanded + Sample {
         let mut matrix_c = vec![0u16; Self::N_BAR_X_N_BAR];
 
         self.encode_message(&g2_in[Self::BYTES_PK_HASH..], &mut matrix_c);
+
         self.add(&matrix_v, &mut matrix_c);
+
         self.pack(&matrix_c, ct.c2_mut());
 
         shake.update(&ct.0);
@@ -260,9 +260,7 @@ pub trait Kem: Params + Expanded + Sample {
             *b = u16::from_le_bytes(u16_buffer);
         }
 
-        Self::sample(&mut sp[..Self::N_X_N_BAR]);
-        Self::sample(&mut sp[Self::N_X_N_BAR..2 * Self::N_X_N_BAR]);
-        Self::sample(&mut sp[2 * Self::N_X_N_BAR..]);
+        Self::sample(&mut sp);
 
         let s = &sp[..Self::N_X_N_BAR];
         let ep = &sp[Self::N_X_N_BAR..2 * Self::N_X_N_BAR];
@@ -406,23 +404,23 @@ pub trait Kem: Params + Expanded + Sample {
     fn encode_message(&self, msg: &[u8], output: &mut [u16]) {
         debug_assert_eq!(msg.len(), Self::SHARED_SECRET_LENGTH);
         debug_assert_eq!(output.len(), Self::N_BAR_X_N_BAR);
-
-        let j_limit = 16 / Self::EXTRACTED_BITS;
+        let n_words = Self::N_BAR_X_N_BAR / 8;
+        let mask = (1u64 << Self::EXTRACTED_BITS) - 1;
+        let mut temp = 0u64;
         let mut pos = 0;
-        let mut i = 0;
-        let mut ii = 0;
 
-        while ii < msg.len() {
-            let mut input = u16::from_le_bytes([msg[ii], msg[ii + 1]]);
-            for _ in 0..j_limit {
-                output[pos] = (input & Self::EXTRACTED_BITS_MASK) << Self::SHIFT;
-                pos += 1;
-
-                input >>= Self::EXTRACTED_BITS;
+        for i in 0..n_words {
+            temp = 0;
+            let ii = i * Self::EXTRACTED_BITS;
+            for j in 0..Self::EXTRACTED_BITS {
+                let t = msg[ii + j] as u64;
+                temp |= t << (8 * j);
             }
-
-            i += 1;
-            ii = i * 2;
+            for _ in 0..8 {
+                output[pos] = ((temp & mask) << Self::SHIFT) as u16;
+                temp >>= Self::EXTRACTED_BITS;
+                pos += 1;
+            }
         }
     }
 
@@ -430,108 +428,116 @@ pub trait Kem: Params + Expanded + Sample {
         debug_assert_eq!(input.len(), Self::N_BAR_X_N_BAR);
         debug_assert_eq!(output.len(), Self::SHARED_SECRET_LENGTH);
 
+        let n_words = Self::N_BAR_X_N_BAR / 8;
+        let mut index = 0;
         let add = 1u16 << (Self::SHIFT - 1);
-        let j_limit = 8 / Self::EXTRACTED_BITS;
 
-        let mut pos = 0;
-        let out_len = output.len();
-        for i in 0..out_len {
-            for j in 0..j_limit {
-                let mut t = (input[pos] & Self::Q_MASK) + add;
+        for i in 0..n_words {
+            let mut temp = 0u64;
+            for j in 0..8 {
+                let mut t = (input[index] & Self::Q_MASK).wrapping_add(add);
                 t >>= Self::SHIFT;
-                t &= Self::EXTRACTED_BITS_MASK;
-                output[i] |= (t as u8) << (j * Self::EXTRACTED_BITS);
-                pos += 1;
+                temp |= ((t & Self::EXTRACTED_BITS_MASK) as u64) << (Self::EXTRACTED_BITS * j);
+                index += 1;
+            }
+            let ii = i * Self::EXTRACTED_BITS;
+            for j in 0..Self::EXTRACTED_BITS {
+                output[ii + j] = (temp >> (8 * j)) as u8;
             }
         }
     }
 
     fn pack(&self, input: &[u16], output: &mut [u8]) {
         let mut i = 0;
-        let mut ii = 0;
         let mut j = 0;
+        let mut w = 0u16;
+        let mut bits = 0u8;
+        let lsb = Self::LOG_Q as u8;
 
-        while ii < input.len() {
-            let in0 = input[ii] & Self::Q_MASK;
-            let in1 = input[ii + 1] & Self::Q_MASK;
-            let in2 = input[ii + 2] & Self::Q_MASK;
-            let in3 = input[ii + 3] & Self::Q_MASK;
-            let in4 = input[ii + 4] & Self::Q_MASK;
-            let in5 = input[ii + 5] & Self::Q_MASK;
-            let in6 = input[ii + 6] & Self::Q_MASK;
-            let in7 = input[ii + 7] & Self::Q_MASK;
+        let outlen = output.len();
+        let inlen = input.len();
 
-            output[j] |= (in0 >> 7) as u8;
-            output[j + 1] = (((in0 & 0x7F) as u8) << 1) | ((in1 >> 14) as u8);
+        while i < outlen && (j < inlen || (j == inlen && bits > 0)) {
+            let mut b = 0u8;
 
-            output[j + 2] = (in1 >> 6) as u8;
-            output[j + 3] = (((in1 & 0x3F) as u8) << 2) | ((in2 >> 13) as u8);
+            while b < 8 {
+                let nbits = std::cmp::min(8 - b, bits);
+                let mask = (1u16 << nbits).wrapping_sub(1);
 
-            output[j + 4] = (in2 >> 5) as u8;
-            output[j + 5] = (((in2 & 0x1F) as u8) << 3) | ((in3 >> 12) as u8);
+                let w_shifted = w >> (bits - nbits);
 
-            output[j + 6] = (in3 >> 4) as u8;
-            output[j + 7] = (((in3 & 0x0F) as u8) << 4) | ((in4 >> 11) as u8);
+                let t = (w_shifted & mask) as u32;
 
-            output[j + 8] = (in4 >> 3) as u8;
-            output[j + 9] = (((in4 & 0x07) as u8) << 5) | ((in5 >> 10) as u8);
+                let t_shifted = (t << (8 - b - nbits)) as u8;
 
-            output[j + 10] = (in5 >> 2) as u8;
-            output[j + 11] = (((in5 & 0x03) as u8) << 6) | ((in6 >> 9) as u8);
+                output[i] = output[i].wrapping_add(t_shifted);
+                b = b.wrapping_add(nbits);
+                bits = bits.wrapping_sub(nbits);
 
-            output[j + 12] = (in6 >> 1) as u8;
-            output[j + 13] = (((in6 & 0x01) as u8) << 7) | ((in7 >> 8) as u8);
+                let mask_shifted = !(mask << bits);
 
-            output[j + 14] = in7 as u8;
+                w &= mask_shifted as u16;
 
-            j += 15;
-            i += 1;
-            ii = i * 8;
+                if bits == 0 {
+                    if j < inlen {
+                        w = input[j];
+                        bits = lsb;
+                        j += 1;
+                    } else {
+                        break;
+                    }
+                }
+            }
+            if b == 8 {
+                i += 1;
+            }
         }
     }
 
     fn unpack(&self, input: &[u8], output: &mut [u16]) {
         let mut i = 0;
-        let mut ii = 0;
         let mut j = 0;
+        let mut w = 0u8;
+        let mut bits = 0u8;
+        let lsb = Self::LOG_Q as u8;
 
-        while ii < input.len() {
-            let in0 = input[ii];
-            let in1 = input[ii + 1];
-            let in2 = input[ii + 2];
-            let in3 = input[ii + 3];
-            let in4 = input[ii + 4];
-            let in5 = input[ii + 5];
-            let in6 = input[ii + 6];
-            let in7 = input[ii + 7];
-            let in8 = input[ii + 8];
-            let in9 = input[ii + 9];
-            let in10 = input[ii + 10];
-            let in11 = input[ii + 11];
-            let in12 = input[ii + 12];
-            let in13 = input[ii + 13];
-            let in14 = input[ii + 14];
+        let outlen = output.len();
+        let inlen = input.len();
 
-            output[j] = ((in0 as u16) << 7) | (((in1 & 0xFE) as u16) >> 1);
-            output[j + 1] =
-                (((in1 & 0x01) as u16) << 14) | ((in2 as u16) << 6) | (((in3 & 0xFC) as u16) >> 2);
-            output[j + 2] =
-                (((in3 & 0x03) as u16) << 13) | ((in4 as u16) << 5) | (((in5 & 0xF8) as u16) >> 3);
-            output[j + 3] =
-                (((in5 & 0x07) as u16) << 12) | ((in6 as u16) << 4) | (((in7 & 0xF0) as u16) >> 4);
-            output[j + 4] =
-                (((in7 & 0x0F) as u16) << 11) | ((in8 as u16) << 3) | (((in9 & 0xE0) as u16) >> 5);
-            output[j + 5] = (((in9 & 0x1F) as u16) << 10)
-                | ((in10 as u16) << 2)
-                | (((in11 & 0xC0) as u16) >> 6);
-            output[j + 6] = (((in11 & 0x3F) as u16) << 9)
-                | ((in12 as u16) << 1)
-                | (((in13 & 0x80) as u16) >> 7);
-            output[j + 7] = (((in13 & 0x7F) as u16) << 8) | (in14 as u16);
+        while i < outlen && (j < inlen || (j == inlen && bits > 0)) {
+            let mut b = 0u8;
 
-            j += 8;
-            i += 1;
-            ii = i * 15;
+            while b < lsb {
+                let nbits = std::cmp::min(lsb - b, bits);
+                let mask = (1u16 << nbits).wrapping_sub(1);
+
+                let w_shifted = w >> (bits.wrapping_sub(nbits));
+
+                let t = w_shifted & (mask as u8);
+
+                let t_shifted = ((t as u32) << (lsb - b - nbits)) as u16;
+
+                output[i] = output[i].wrapping_add(t_shifted);
+                b = b.wrapping_add(nbits);
+                bits = bits.wrapping_sub(nbits);
+
+                let mask_shifted = !(mask << bits);
+
+                w &= mask_shifted as u8;
+
+                if bits == 0 {
+                    if j < inlen {
+                        w = input[j];
+                        j += 1;
+                        bits = 8;
+                    }
+                } else {
+                    break;
+                }
+            }
+            if b == lsb {
+                i += 1;
+            }
         }
     }
 
@@ -542,6 +548,7 @@ pub trait Kem: Params + Expanded + Sample {
             choice |= a[i] ^ b[i];
         }
 
+        let mut choice = choice as i16;
         choice = ((choice | choice.wrapping_neg()) >> 15) + 1;
         Choice::from(choice as u8)
     }

@@ -56,7 +56,7 @@ pub type FrodoKem640Shake = FrodoKem<Frodo640, FrodoShake<Frodo640>, FrodoCdfSam
 
 #[cfg(feature = "frodo976shake")]
 /// The FrodoKEM-976-SHAKE algorithm
-pub type FrodoKem976Shake = FrodoKem<Frodo976, FrodoShake<Frodo640>, FrodoCdfSample<Frodo640>>;
+pub type FrodoKem976Shake = FrodoKem<Frodo976, FrodoShake<Frodo976>, FrodoCdfSample<Frodo976>>;
 
 #[cfg(feature = "frodo1344shake")]
 /// The FrodoKEM-1344-SHAKE algorithm
@@ -106,13 +106,24 @@ mod tests {
         assert_eq!(FrodoKem640Shake::CIPHERTEXT_LENGTH, 9720);
     }
 
-    #[ignore]
     #[test]
-    fn aes976_generate_keypair_compatibility() {
-        generate_keypair_compatibility(
-            FrodoKem976Aes::default(),
-            safe_oqs::kem::Algorithm::FrodoKem976Aes,
-        );
+    fn shake976_compatibility() {
+        let safe_kem = safe_oqs::kem::Kem::new(safe_oqs::kem::Algorithm::FrodoKem976Shake).unwrap();
+        let (their_pk, their_sk) = safe_kem.keypair().unwrap();
+        let my_pk = PublicKey::<FrodoKem976Shake>::from_slice(their_pk.as_ref()).unwrap();
+        let my_sk = SecretKey::<FrodoKem976Shake>::from_slice(their_sk.as_ref()).unwrap();
+
+        let kem = FrodoKem976Shake::default();
+
+        let mut rng = rand_chacha::ChaCha8Rng::from_seed([1u8; 32]);
+
+        let (my_ct, my_ess) = kem.encapsulate(&my_pk, &mut rng);
+        let my_ss = kem.decapsulate(&my_ct, &my_sk);
+        assert_eq!(my_ess.as_ref(), my_ss.as_ref());
+
+        let their_ct = safe_kem.ciphertext_from_bytes(my_ct.as_ref()).unwrap();
+        let their_ss = safe_kem.decapsulate(&their_sk, &their_ct).unwrap();
+        assert_eq!(my_ess.as_ref(), their_ss.as_ref());
     }
 
     #[rstest]
@@ -207,7 +218,6 @@ mod tests {
     fn decapsulate_compatibility<F: Kem>(#[case] kem: F, #[case] alg: safe_oqs::kem::Algorithm) {
         let mut rng = rand_chacha::ChaCha8Rng::from_seed([1u8; 32]);
         let (our_pk, our_sk) = kem.generate_keypair(&mut rng);
-        println!("our_sk: {}", hex::encode(our_sk.as_ref()));
         let safe_kem = safe_oqs::kem::Kem::new(alg).unwrap();
 
         let opt_pk = safe_kem.public_key_from_bytes(&our_pk.0);
