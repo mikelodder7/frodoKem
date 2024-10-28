@@ -30,14 +30,6 @@ pub use error::*;
 pub use models::*;
 pub use traits::*;
 
-use rand_core::CryptoRngCore;
-use sha3::digest::{ExtendableOutput, ExtendableOutputReset, Update, XofReader};
-use std::{
-    io::{Cursor, Write},
-    marker::PhantomData,
-};
-use zeroize::Zeroize;
-
 #[cfg(feature = "frodo640aes")]
 /// The FrodoKEM-640-AES algorithm
 pub type FrodoKem640Aes = FrodoKem<Frodo640, FrodoAes<Frodo640>, FrodoCdfSample<Frodo640>>;
@@ -75,7 +67,6 @@ mod tests {
         assert_eq!(FrodoKem640Shake::LOG_Q, 15);
         assert_eq!(FrodoKem640Shake::EXTRACTED_BITS, 2);
         assert_eq!(FrodoKem640Shake::STRIPE_STEP, 8);
-        assert_eq!(FrodoKem640Shake::PARALLEL, 4);
         assert_eq!(FrodoKem640Shake::BYTES_SEED_A, 16);
         assert_eq!(FrodoKem640Shake::BYTES_MU, 16);
         assert_eq!(FrodoKem640Shake::BYTES_PK_HASH, 16);

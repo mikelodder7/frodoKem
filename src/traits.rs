@@ -19,31 +19,50 @@ pub trait Params: Sized {
     const N: usize;
     /// The number of rows in the matrix
     const N_BAR: usize = 8;
+    /// The log of the modulus
     const LOG_Q: usize;
+    /// The number of bits to extract when packing/unpacking
+    /// encoding/decoding
     const EXTRACTED_BITS: usize;
+    /// The number of steps for striping
     const STRIPE_STEP: usize = 8;
-    const PARALLEL: usize = 4;
+    /// The number of bytes in the seed for generating the matrix A
     const BYTES_SEED_A: usize = 16;
+    /// The number of bytes in the public key hash
     const BYTES_PK_HASH: usize = Self::SHARED_SECRET_LENGTH;
+    /// The CDF table
     const CDF_TABLE: &'static [u16];
+    /// The claimed NIST level
     const CLAIMED_NIST_LEVEL: usize;
+    /// The length of the shared secret
     const SHARED_SECRET_LENGTH: usize;
+    /// The number of bytes in µ
     const BYTES_MU: usize = (Self::EXTRACTED_BITS * Self::N_BAR_X_N_BAR) / 8;
     /// = len(s) + len(seedSE) + len(z)
     const KEY_SEED_SIZE: usize = 2 * Self::SHARED_SECRET_LENGTH + Self::BYTES_SEED_A;
+    /// 2 * N
     const TWO_N: usize = 2 * Self::N;
+    /// 2 + SEED_A
     const TWO_PLUS_BYTES_SEED_A: usize = 2 + Self::BYTES_SEED_A;
-    ///
+    /// N * N
     const N_X_N: usize = Self::N * Self::N;
+    /// N * N_BAR
     const N_X_N_BAR: usize = Self::N * Self::N_BAR;
+    /// N_BAR * N
     const N_BAR_X_N: usize = Self::N_BAR * Self::N;
+    /// N_BAR * N_BAR
     const N_BAR_X_N_BAR: usize = Self::N_BAR * Self::N_BAR;
+    /// 2 * N * N_BAR
     const TWO_N_X_N_BAR: usize = 2 * Self::N_X_N_BAR;
+    /// The number of bits to extract
     const EXTRACTED_BITS_MASK: u16 = (1 << Self::EXTRACTED_BITS) - 1;
+    /// The number of bits to shift when encoding and decoding
     const SHIFT: usize = Self::LOG_Q - Self::EXTRACTED_BITS;
+    /// The modulus
     const Q: usize = 1 << Self::LOG_Q;
     /// The mask for the modulus
     const Q_MASK: u16 = (Self::Q - 1) as u16;
+    /// LOG_Q * N * N_BAR / 8
     const LOG_Q_X_N_X_N_BAR_DIV_8: usize = (Self::LOG_Q * Self::N_X_N_BAR) / 8;
     /// The public key length
     const PUBLIC_KEY_LENGTH: usize = Self::LOG_Q_X_N_X_N_BAR_DIV_8 + Self::BYTES_SEED_A;
@@ -57,10 +76,20 @@ pub trait Params: Sized {
         Self::LOG_Q_X_N_X_N_BAR_DIV_8 + (Self::LOG_Q * Self::N_BAR_X_N_BAR) / 8;
 }
 
+/// Trait for implementing the FrodoKEM sampling algorithm
+///
+/// See Algorithm 5 and 6 in the [spec](https://frodokem.org/files/FrodoKEM-specification-20210604.pdf).
 pub trait Sample {
+    /// The method used to sample.
+    ///
+    /// s is the input that will be modified in place with the noise
     fn sample(s: &mut [u16]);
 }
 
+/// Trait for implementing equivalents to
+/// Algorithm 7 and 8 in the [spec](https://frodokem.org/files/FrodoKEM-specification-20210604.pdf).
+///
+/// Expand the seed to produce the matrix A
 pub trait Expanded {
     /// The method used to expand the seed
     const METHOD: &'static str;
@@ -69,6 +98,7 @@ pub trait Expanded {
     fn expand_a(seed_a: &[u8], a: &mut [u16]);
 }
 
+/// Trait for implementing FrodoKem
 pub trait Kem: Params + Expanded + Sample {
     /// Get the algorithm name
     fn algorithm(&self) -> String {
@@ -77,7 +107,7 @@ pub trait Kem: Params + Expanded + Sample {
 
     /// Generate a keypair
     ///
-    /// See Algorithm 9 in specification
+    /// See Algorithm 9 in [spec](https://frodokem.org/files/FrodoKEM-specification-20210604.pdf).
     fn generate_keypair(&self, mut rng: impl CryptoRngCore) -> (PublicKey<Self>, SecretKey<Self>) {
         let mut sk = SecretKey::default();
         let mut pk = PublicKey::default();
@@ -95,7 +125,7 @@ pub trait Kem: Params + Expanded + Sample {
         shake.finalize_xof_reset_into(pk.seed_a_mut());
 
         shake.update(&[0x5F]);
-        shake.update(&randomness_seed_se);
+        shake.update(randomness_seed_se);
         let mut shake_reader = shake.finalize_xof_reset();
         let mut u16_buffer = [0u8; 2];
 
@@ -142,6 +172,9 @@ pub trait Kem: Params + Expanded + Sample {
         (pk, sk)
     }
 
+    /// Encapsulate a message into a ciphertext.
+    ///
+    /// See Algorithm 10 in the [spec](https://frodokem.org/files/FrodoKEM-specification-20210604.pdf).
     fn encapsulate(
         &self,
         public_key: &PublicKey<Self>,
@@ -180,7 +213,7 @@ pub trait Kem: Params + Expanded + Sample {
         Self::expand_a(public_key.seed_a(), &mut matrix_a);
 
         let mut matrix_b = vec![0u16; Self::N_X_N_BAR];
-        self.mul_add_sa_plus_e(&s, &matrix_a, &ep, &mut matrix_b);
+        self.mul_add_sa_plus_e(s, &matrix_a, ep, &mut matrix_b);
 
         self.pack(&matrix_b, ct.c1_mut());
 
@@ -188,7 +221,7 @@ pub trait Kem: Params + Expanded + Sample {
         self.unpack(public_key.matrix_b(), &mut pk_matrix_b);
 
         let mut matrix_v = vec![0u16; Self::N_BAR_X_N_BAR];
-        self.mul_add_sb_plus_e(&s, &pk_matrix_b, &epp, &mut matrix_v);
+        self.mul_add_sb_plus_e(s, &pk_matrix_b, epp, &mut matrix_v);
 
         let mut matrix_c = vec![0u16; Self::N_BAR_X_N_BAR];
 
@@ -210,6 +243,9 @@ pub trait Kem: Params + Expanded + Sample {
         (ct, ss)
     }
 
+    /// Decapsulate the ciphertext into a shared secret.
+    ///
+    /// See Algorithm 11 in the [spec](https://frodokem.org/files/FrodoKEM-specification-20210604.pdf).
     fn decapsulate(
         &self,
         ciphertext: &Ciphertext<Self>,
@@ -267,18 +303,18 @@ pub trait Kem: Params + Expanded + Sample {
         let epp = &sp[2 * Self::N_X_N_BAR..];
 
         let mut matrix_a = vec![0u16; Self::N_X_N];
-        Self::expand_a(&pk.seed_a(), &mut matrix_a);
+        Self::expand_a(pk.seed_a(), &mut matrix_a);
 
         let mut matrix_bpp = vec![0u16; Self::N_X_N_BAR];
-        self.mul_add_sa_plus_e(&s, &matrix_a, &ep, &mut matrix_bpp);
+        self.mul_add_sa_plus_e(s, &matrix_a, ep, &mut matrix_bpp);
         // BB mod q
         matrix_bpp.iter_mut().for_each(|b| *b &= Self::Q_MASK);
 
         let mut matrix_b = vec![0u16; Self::N_X_N_BAR];
-        self.unpack(&pk.matrix_b(), &mut matrix_b);
+        self.unpack(pk.matrix_b(), &mut matrix_b);
 
         // W = Sp*B + Epp
-        self.mul_add_sb_plus_e(&s, &matrix_b, &epp, &mut matrix_w);
+        self.mul_add_sb_plus_e(s, &matrix_b, epp, &mut matrix_w);
 
         // CC = W + enc(µ') mod q
         let mut matrix_cc = vec![0u16; Self::N_BAR_X_N_BAR];
@@ -294,7 +330,7 @@ pub trait Kem: Params + Expanded + Sample {
             self.ct_verify(&matrix_bp, &matrix_bpp) & self.ct_verify(&matrix_c, &matrix_cc);
 
         let mut fin_k = vec![0u8; Self::SHARED_SECRET_LENGTH];
-        /// Take k if choice == 0, otherwise take s
+        // Take k if choice == 0, otherwise take s
         self.ct_select(
             choice,
             &g2_out[Self::SHARED_SECRET_LENGTH..],
@@ -308,6 +344,11 @@ pub trait Kem: Params + Expanded + Sample {
         ss
     }
 
+    /// Multiply by s on the right.
+    ///
+    /// Uses matrix A row-wise
+    /// Inputs: s, e (N x N_BAR)
+    /// Output: out = A*s + e (N x N_BAR)
     fn mul_add_as_plus_e(&self, a: &[u16], s: &[u16], e: &[u16], b: &mut [u16]) {
         debug_assert_eq!(a.len(), Self::N_X_N);
         debug_assert_eq!(s.len(), Self::N_X_N_BAR);
@@ -327,6 +368,11 @@ pub trait Kem: Params + Expanded + Sample {
         }
     }
 
+    /// Multiply by s' on the left.
+    ///
+    /// Uses matrix A column-wise
+    /// Inputs: s', e' (N_BAR x N)
+    /// Output: out = s'*A + e' (N_BAR x N)
     fn mul_add_sa_plus_e(&self, s: &[u16], a: &[u16], e: &[u16], out: &mut [u16]) {
         debug_assert_eq!(a.len(), Self::N_X_N);
         debug_assert_eq!(s.len(), Self::N_X_N_BAR);
@@ -367,6 +413,7 @@ pub trait Kem: Params + Expanded + Sample {
         }
     }
 
+    /// Matrix multiply B on the lhs and S on the rhs
     fn mul_bs(&self, b: &[u16], s: &[u16], out: &mut [u16]) {
         debug_assert_eq!(b.len(), Self::N_BAR_X_N);
         debug_assert_eq!(s.len(), Self::N_X_N_BAR);
@@ -385,6 +432,7 @@ pub trait Kem: Params + Expanded + Sample {
         }
     }
 
+    /// Matrix subtraction
     fn add(&self, rhs: &[u16], out: &mut [u16]) {
         debug_assert_eq!(rhs.len(), Self::N_BAR_X_N_BAR);
         debug_assert_eq!(out.len(), Self::N_BAR_X_N_BAR);
@@ -393,6 +441,7 @@ pub trait Kem: Params + Expanded + Sample {
         }
     }
 
+    /// Matrix subtraction
     fn sub(&self, lhs: &[u16], out: &mut [u16]) {
         debug_assert_eq!(lhs.len(), Self::N_BAR_X_N_BAR);
         debug_assert_eq!(out.len(), Self::N_BAR_X_N_BAR);
@@ -401,16 +450,18 @@ pub trait Kem: Params + Expanded + Sample {
         }
     }
 
+    /// Matrix encoding into a bit sequence
+    ///
+    /// See Algorithm 1 in the [spec](https://frodokem.org/files/FrodoKEM-specification-20210604.pdf).
     fn encode_message(&self, msg: &[u8], output: &mut [u16]) {
         debug_assert_eq!(msg.len(), Self::SHARED_SECRET_LENGTH);
         debug_assert_eq!(output.len(), Self::N_BAR_X_N_BAR);
         let n_words = Self::N_BAR_X_N_BAR / 8;
         let mask = (1u64 << Self::EXTRACTED_BITS) - 1;
-        let mut temp = 0u64;
         let mut pos = 0;
 
         for i in 0..n_words {
-            temp = 0;
+            let mut temp = 0;
             let ii = i * Self::EXTRACTED_BITS;
             for j in 0..Self::EXTRACTED_BITS {
                 let t = msg[ii + j] as u64;
@@ -424,6 +475,9 @@ pub trait Kem: Params + Expanded + Sample {
         }
     }
 
+    /// Matrix decoding from a bit sequence
+    ///
+    /// See Algorithm 2 in the [spec](https://frodokem.org/files/FrodoKEM-specification-20210604.pdf).
     fn decode_message(&self, input: &[u16], output: &mut [u8]) {
         debug_assert_eq!(input.len(), Self::N_BAR_X_N_BAR);
         debug_assert_eq!(output.len(), Self::SHARED_SECRET_LENGTH);
@@ -447,6 +501,9 @@ pub trait Kem: Params + Expanded + Sample {
         }
     }
 
+    /// Pack the matrix input into the output byte sequence
+    ///
+    /// See Algorithm 3 in the [spec](https://frodokem.org/files/FrodoKEM-specification-20210604.pdf).
     fn pack(&self, input: &[u16], output: &mut [u8]) {
         let mut i = 0;
         let mut j = 0;
@@ -476,7 +533,7 @@ pub trait Kem: Params + Expanded + Sample {
 
                 let mask_shifted = !(mask << bits);
 
-                w &= mask_shifted as u16;
+                w &= mask_shifted;
 
                 if bits == 0 {
                     if j < inlen {
@@ -494,6 +551,9 @@ pub trait Kem: Params + Expanded + Sample {
         }
     }
 
+    /// Unpack the input byte sequence into the output matrix
+    ///
+    /// See Algorithm 4 in the [spec](https://frodokem.org/files/FrodoKEM-specification-20210604.pdf).
     fn unpack(&self, input: &[u8], output: &mut [u16]) {
         let mut i = 0;
         let mut j = 0;
@@ -541,6 +601,7 @@ pub trait Kem: Params + Expanded + Sample {
         }
     }
 
+    /// Constant time verify for a u16 array
     fn ct_verify(&self, a: &[u16], b: &[u16]) -> Choice {
         let mut choice = 0;
 
@@ -553,6 +614,7 @@ pub trait Kem: Params + Expanded + Sample {
         Choice::from(choice as u8)
     }
 
+    /// Constant time select for a u16 array
     fn ct_select(&self, choice: Choice, a: &[u8], b: &[u8], out: &mut [u8]) {
         for i in 0..a.len() {
             out[i] = u8::conditional_select(&b[i], &a[i], choice);

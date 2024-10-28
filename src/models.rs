@@ -24,25 +24,31 @@ impl<P: Params> Default for Ciphertext<P> {
 }
 
 impl<P: Params> Ciphertext<P> {
+    /// Convert a slice of bytes into a ciphertext
     pub fn from_slice(bytes: &[u8]) -> FrodoResult<Self> {
         if bytes.len() != P::CIPHERTEXT_LENGTH {
             return Err(Error::InvalidCiphertextLength(bytes.len()));
         }
         Ok(Self(bytes.to_vec(), PhantomData))
     }
-    pub(crate) fn c1(&self) -> &[u8] {
+
+    /// Returns a reference to the c1 component
+    pub fn c1(&self) -> &[u8] {
         &self.0[..P::LOG_Q_X_N_X_N_BAR_DIV_8]
     }
 
-    pub(crate) fn c1_mut(&mut self) -> &mut [u8] {
+    /// Returns a mutable reference to the c1 component
+    pub fn c1_mut(&mut self) -> &mut [u8] {
         &mut self.0[..P::LOG_Q_X_N_X_N_BAR_DIV_8]
     }
 
-    pub(crate) fn c2(&self) -> &[u8] {
+    /// Returns a reference to the c2 component
+    pub fn c2(&self) -> &[u8] {
         &self.0[P::LOG_Q_X_N_X_N_BAR_DIV_8..]
     }
 
-    pub(crate) fn c2_mut(&mut self) -> &mut [u8] {
+    /// Returns a mutable reference to the c2 component
+    pub fn c2_mut(&mut self) -> &mut [u8] {
         &mut self.0[P::LOG_Q_X_N_X_N_BAR_DIV_8..]
     }
 }
@@ -70,6 +76,7 @@ impl<P: Params> From<&SecretKey<P>> for PublicKey<P> {
 }
 
 impl<P: Params> PublicKey<P> {
+    /// Convert a slice of bytes into a public key
     pub fn from_slice(bytes: &[u8]) -> FrodoResult<Self> {
         if bytes.len() != P::PUBLIC_KEY_LENGTH {
             return Err(Error::InvalidPublicKeyLength(bytes.len()));
@@ -77,19 +84,23 @@ impl<P: Params> PublicKey<P> {
         Ok(Self(bytes.to_vec(), PhantomData))
     }
 
-    pub(crate) fn seed_a(&self) -> &[u8] {
+    /// Returns a reference to the seed A
+    pub fn seed_a(&self) -> &[u8] {
         &self.0[..P::BYTES_SEED_A]
     }
 
-    pub(crate) fn seed_a_mut(&mut self) -> &mut [u8] {
+    /// Returns a mutable reference to the seed A
+    pub fn seed_a_mut(&mut self) -> &mut [u8] {
         &mut self.0[..P::BYTES_SEED_A]
     }
 
-    pub(crate) fn matrix_b(&self) -> &[u8] {
+    /// Returns a reference to the matrix B
+    pub fn matrix_b(&self) -> &[u8] {
         &self.0[P::BYTES_SEED_A..]
     }
 
-    pub(crate) fn matrix_b_mut(&mut self) -> &mut [u8] {
+    /// Returns a mutable reference to the matrix B
+    pub fn matrix_b_mut(&mut self) -> &mut [u8] {
         &mut self.0[P::BYTES_SEED_A..]
     }
 }
@@ -144,6 +155,7 @@ impl<P: Params> Zeroize for SecretKey<P> {
 impl<P: Params> ZeroizeOnDrop for SecretKey<P> {}
 
 impl<P: Params> SecretKey<P> {
+    /// Convert a slice of bytes into a secret key
     pub fn from_slice(bytes: &[u8]) -> FrodoResult<Self> {
         if bytes.len() != P::SECRET_KEY_LENGTH {
             return Err(Error::InvalidSecretKeyLength(bytes.len()));
@@ -151,36 +163,44 @@ impl<P: Params> SecretKey<P> {
         Ok(Self(bytes.to_vec(), PhantomData))
     }
 
+    /// Returns a reference to the shared secret
     pub fn random_s(&self) -> &[u8] {
         &self.0[..P::SHARED_SECRET_LENGTH]
     }
 
+    /// Returns a mutable reference to the shared secret
     pub fn random_s_mut(&mut self) -> &mut [u8] {
         &mut self.0[..P::SHARED_SECRET_LENGTH]
     }
 
+    /// Returns a reference to the public key
     pub fn public_key(&self) -> &[u8] {
         &self.0[P::SHARED_SECRET_LENGTH..P::SHARED_SECRET_LENGTH + P::PUBLIC_KEY_LENGTH]
     }
 
+    /// Returns a mutable reference to the public key
     pub fn public_key_mut(&mut self) -> &mut [u8] {
         &mut self.0[P::SHARED_SECRET_LENGTH..P::SHARED_SECRET_LENGTH + P::PUBLIC_KEY_LENGTH]
     }
 
+    /// Returns a reference to the matrix s
     pub fn matrix_s(&self) -> &[u8] {
         &self.0[P::SHARED_SECRET_LENGTH + P::PUBLIC_KEY_LENGTH
             ..P::SHARED_SECRET_LENGTH + P::PUBLIC_KEY_LENGTH + P::TWO_N_X_N_BAR]
     }
 
+    /// Returns a mutable reference to the matrix s
     pub fn matrix_s_mut(&mut self) -> &mut [u8] {
         &mut self.0[P::SHARED_SECRET_LENGTH + P::PUBLIC_KEY_LENGTH
             ..P::SHARED_SECRET_LENGTH + P::PUBLIC_KEY_LENGTH + P::TWO_N_X_N_BAR]
     }
 
+    /// Returns a reference to the hash of the public key
     pub fn hpk(&self) -> &[u8] {
         &self.0[P::SHARED_SECRET_LENGTH + P::PUBLIC_KEY_LENGTH + P::TWO_N_X_N_BAR..]
     }
 
+    /// Returns a mutable reference to the hash of the public key
     pub fn hpk_mut(&mut self) -> &mut [u8] {
         &mut self.0[P::SHARED_SECRET_LENGTH + P::PUBLIC_KEY_LENGTH + P::TWO_N_X_N_BAR..]
     }
@@ -211,6 +231,7 @@ impl<P: Params> Zeroize for SharedSecret<P> {
 impl<P: Params> ZeroizeOnDrop for SharedSecret<P> {}
 
 impl<P: Params> SharedSecret<P> {
+    /// Convert a slice of bytes into a shared secret
     pub fn from_slice(bytes: &[u8]) -> FrodoResult<Self> {
         if bytes.len() != P::SHARED_SECRET_LENGTH {
             return Err(Error::InvalidSharedSecretLength(bytes.len()));
@@ -219,6 +240,7 @@ impl<P: Params> SharedSecret<P> {
     }
 }
 
+/// The FrodoKEM scheme
 #[derive(
     Copy, Clone, Default, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Deserialize, Serialize,
 )]
@@ -250,6 +272,7 @@ impl<P: Params, E: Expanded, S: Sample> Sample for FrodoKem<P, E, S> {
 impl<P: Params, E: Expanded, S: Sample> Kem for FrodoKem<P, E, S> {}
 
 #[cfg(any(feature = "frodo640aes", feature = "frodo640shake"))]
+/// Frodo640 parameters
 #[derive(
     Copy, Clone, Default, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Deserialize, Serialize,
 )]
@@ -269,6 +292,7 @@ impl Params for Frodo640 {
 }
 
 #[cfg(any(feature = "frodo976aes", feature = "frodo976shake"))]
+/// Frodo976 parameters
 #[derive(
     Copy, Clone, Default, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Deserialize, Serialize,
 )]
@@ -288,6 +312,7 @@ impl Params for Frodo976 {
 }
 
 #[cfg(any(feature = "frodo1344aes", feature = "frodo1344shake"))]
+/// Frodo1344 parameters
 #[derive(
     Copy, Clone, Default, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Deserialize, Serialize,
 )]
@@ -311,7 +336,7 @@ impl Params for Frodo1344 {
 ))]
 /// Generate matrix A (N x N) column-wise using AES-128
 ///
-/// See Algorithm 7
+/// See Algorithm 7 in the [spec](https://frodokem.org/files/FrodoKEM-specification-20190215.pdf)
 #[derive(
     Copy, Clone, Default, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Deserialize, Serialize,
 )]
@@ -359,7 +384,7 @@ impl<P: Params> Expanded for FrodoAes<P> {
 ))]
 /// Generate matrix A (N x N) column-wise using SHAKE-128
 ///
-/// See Algorithm 8
+/// See Algorithm 8 in the [spec](https://frodokem.org/files/FrodoKEM-specification-20190215.pdf)
 #[derive(
     Copy, Clone, Default, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Deserialize, Serialize,
 )]
@@ -401,6 +426,7 @@ impl<P: Params> Expanded for FrodoShake<P> {
     }
 }
 
+/// Generate sample noise using a CDF
 #[derive(
     Copy, Clone, Default, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Deserialize, Serialize,
 )]
@@ -408,17 +434,16 @@ pub struct FrodoCdfSample<P: Params>(pub PhantomData<P>);
 
 impl<P: Params> Sample for FrodoCdfSample<P> {
     fn sample(s: &mut [u16]) {
-        let n = s.len();
-        for i in 0..n {
+        for s_i in s.iter_mut() {
             let mut sample = 0u16;
-            let prnd = s[i] >> 1; // Drop the least significant bit
-            let sign = s[i] & 1; // Get the least significant bit
+            let prnd = *s_i >> 1; // Drop the least significant bit
+            let sign = *s_i & 1; // Get the least significant bit
 
             for cdf in P::CDF_TABLE {
                 sample = sample.wrapping_add(cdf.wrapping_sub(prnd) >> 15);
             }
 
-            s[i] = (sign.wrapping_neg() ^ sample).wrapping_add(sign);
+            *s_i = (sign.wrapping_neg() ^ sample).wrapping_add(sign);
         }
     }
 }
