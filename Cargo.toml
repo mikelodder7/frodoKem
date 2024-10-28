@@ -34,7 +34,6 @@ thiserror = "1.0"
 zeroize = "1"
 
 [dev-dependencies]
-hex = "0.4.3"
 rand_chacha = "0.3"
 rstest = "0.23"
 safe-oqs = { version = "0.10", default-features = false, features = ["frodokem"] }
