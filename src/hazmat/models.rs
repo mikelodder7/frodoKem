@@ -199,6 +199,7 @@ impl<P: Params> PublicKey<P> {
     }
 }
 
+/// A FrodoKEM public key reference
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct PublicKeyRef<'a, P: Params>(pub(crate) &'a [u8], pub(crate) PhantomData<P>);
 

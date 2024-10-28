@@ -102,7 +102,7 @@ mod tests {
         let mut rng = rand_chacha::ChaCha8Rng::from_seed([1u8; 32]);
 
         let (my_ct, my_ess) = kem.encapsulate_with_rng(&my_pk, &mut rng);
-        let my_ss = kem.decapsulate(&my_sk, &my_ct);
+        let (my_ss, _) = kem.decapsulate(&my_sk, &my_ct);
         assert_eq!(my_ess.as_ref(), my_ss.as_ref());
 
         let their_ct = safe_kem.ciphertext_from_bytes(my_ct.as_ref()).unwrap();
@@ -215,11 +215,10 @@ mod tests {
         let their_pk = opt_pk.unwrap();
         let opt_sk = safe_kem.secret_key_from_bytes(&our_sk.0);
         assert!(opt_sk.is_some());
-        let their_sk = opt_sk.unwrap();
 
         let (our_ciphertext, our_ss) = kem.encapsulate_with_rng(&our_pk, &mut rng);
 
-        let opt_ss = kem.decapsulate(&our_sk, &our_ciphertext);
+        let (opt_ss, _) = kem.decapsulate(&our_sk, &our_ciphertext);
         assert_eq!(opt_ss.as_ref(), our_ss.as_ref());
 
         let (their_ct, their_ss) = safe_kem.encapsulate(&their_pk).unwrap();

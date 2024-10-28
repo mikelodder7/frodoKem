@@ -176,9 +176,9 @@ pub trait Kem: Params + Expanded + Sample {
     /// Encapsulate a random message into a ciphertext.
     ///
     /// See Algorithm 10 in the [spec](https://frodokem.org/files/FrodoKEM-specification-20210604.pdf).
-    fn encapsulate_with_rng(
+    fn encapsulate_with_rng<'a, P: Into<PublicKeyRef<'a, Self>>>(
         &self,
-        public_key: PublicKeyRef<'_, Self>,
+        public_key: P,
         mut rng: impl CryptoRngCore,
     ) -> (Ciphertext<Self>, SharedSecret<Self>) {
         let mut mu = vec![0u8; Self::BYTES_MU];
@@ -191,12 +191,13 @@ pub trait Kem: Params + Expanded + Sample {
     /// Encapsulate a message into a ciphertext.
     ///
     /// See Algorithm 10 in the [spec](https://frodokem.org/files/FrodoKEM-specification-20210604.pdf).
-    fn encapsulate(
+    fn encapsulate<'a, P: Into<PublicKeyRef<'a, Self>>>(
         &self,
-        public_key: PublicKeyRef<'_, Self>,
+        public_key: P,
         mu: &[u8],
     ) -> (Ciphertext<Self>, SharedSecret<Self>) {
         assert_eq!(mu.len(), Self::BYTES_MU);
+        let public_key = public_key.into();
         let mut ct = Ciphertext::default();
         let mut ss = SharedSecret::default();
 
@@ -263,11 +264,14 @@ pub trait Kem: Params + Expanded + Sample {
     /// Decapsulate the ciphertext into a shared secret.
     ///
     /// See Algorithm 11 in the [spec](https://frodokem.org/files/FrodoKEM-specification-20210604.pdf).
-    fn decapsulate(
+    fn decapsulate<'a, 'b, S: Into<SecretKeyRef<'a, Self>>, C: Into<CiphertextRef<'b, Self>>>(
         &self,
-        secret_key: SecretKeyRef<'_, Self>,
-        ciphertext: CiphertextRef<'_, Self>,
+        secret_key: S,
+        ciphertext: C,
     ) -> (SharedSecret<Self>, Vec<u8>) {
+        let secret_key = secret_key.into();
+        let ciphertext = ciphertext.into();
+
         let mut ss = SharedSecret::default();
         let mut matrix_s = vec![0u16; Self::N_X_N_BAR];
         let pk =

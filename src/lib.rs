@@ -710,6 +710,11 @@ mod tests {
 
     #[rstest]
     #[case::aes640(Algorithm::FrodoKem640Aes, kem::Algorithm::FrodoKem640Aes)]
+    #[case::aes976(Algorithm::FrodoKem976Aes, kem::Algorithm::FrodoKem976Aes)]
+    #[case::aes1344(Algorithm::FrodoKem1344Aes, kem::Algorithm::FrodoKem1344Aes)]
+    #[case::shake640(Algorithm::FrodoKem640Shake, kem::Algorithm::FrodoKem640Shake)]
+    #[case::shake976(Algorithm::FrodoKem976Shake, kem::Algorithm::FrodoKem976Shake)]
+    #[case::shake1344(Algorithm::FrodoKem1344Shake, kem::Algorithm::FrodoKem1344Shake)]
     fn works(#[case] alg: Algorithm, #[case] safe_alg: kem::Algorithm) {
         let mut rng = rand_chacha::ChaCha8Rng::from_seed([1u8; 32]);
         for _ in 0..10 {
@@ -733,6 +738,14 @@ mod tests {
 
             let their_ct = kem.ciphertext_from_bytes(&our_ct.0).unwrap();
             let their_ss = kem.decapsulate(&their_sk, &their_ct).unwrap();
+            assert_eq!(our_dss.0, their_ss.as_ref());
+
+            let (their_ct, their_ess) = kem.encapsulate(&their_pk).unwrap();
+
+            let our_ct = alg.ciphertext_from_bytes(&their_ct.as_ref()).unwrap();
+
+            let (their_dss, _) = alg.decapsulate(&our_sk, &our_ct);
+            assert_eq!(their_ess.as_ref(), their_dss.0);
         }
     }
 }
