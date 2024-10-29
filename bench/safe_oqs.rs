@@ -186,7 +186,7 @@ fn bench_decapsulate<'a, M: Measurement>(group: &mut BenchmarkGroup<'a, M>) {
         .unwrap();
     group.bench_function("Decapsulate 640Aes", |b| {
         b.iter(|| {
-            let (_ss, _mu) = Algorithm::FrodoKem640Aes.decapsulate(&sk, &ct);
+            let (_ss, _mu) = Algorithm::FrodoKem640Aes.decapsulate(&sk, &ct).unwrap();
         });
     });
     let kem = safe_oqs::kem::Kem::new(safe_oqs::kem::Algorithm::FrodoKem640Aes).unwrap();
@@ -204,7 +204,7 @@ fn bench_decapsulate<'a, M: Measurement>(group: &mut BenchmarkGroup<'a, M>) {
         .unwrap();
     group.bench_function("Decapsulate 976Aes", |b| {
         b.iter(|| {
-            let (_ss, _mu) = Algorithm::FrodoKem976Aes.decapsulate(&sk, &ct);
+            let (_ss, _mu) = Algorithm::FrodoKem976Aes.decapsulate(&sk, &ct).unwrap();
         });
     });
     let kem = safe_oqs::kem::Kem::new(safe_oqs::kem::Algorithm::FrodoKem976Aes).unwrap();
@@ -222,7 +222,7 @@ fn bench_decapsulate<'a, M: Measurement>(group: &mut BenchmarkGroup<'a, M>) {
         .unwrap();
     group.bench_function("Decapsulate 1344Aes", |b| {
         b.iter(|| {
-            let (_ss, _mu) = Algorithm::FrodoKem1344Aes.decapsulate(&sk, &ct);
+            let (_ss, _mu) = Algorithm::FrodoKem1344Aes.decapsulate(&sk, &ct).unwrap();
         });
     });
     let kem = safe_oqs::kem::Kem::new(safe_oqs::kem::Algorithm::FrodoKem1344Aes).unwrap();
@@ -240,7 +240,7 @@ fn bench_decapsulate<'a, M: Measurement>(group: &mut BenchmarkGroup<'a, M>) {
         .unwrap();
     group.bench_function("Decapsulate 640Shake", |b| {
         b.iter(|| {
-            let (_ss, _mu) = Algorithm::FrodoKem640Shake.decapsulate(&sk, &ct);
+            let (_ss, _mu) = Algorithm::FrodoKem640Shake.decapsulate(&sk, &ct).unwrap();
         });
     });
     let kem = safe_oqs::kem::Kem::new(safe_oqs::kem::Algorithm::FrodoKem640Shake).unwrap();
@@ -258,7 +258,7 @@ fn bench_decapsulate<'a, M: Measurement>(group: &mut BenchmarkGroup<'a, M>) {
         .unwrap();
     group.bench_function("Decapsulate 976Shake", |b| {
         b.iter(|| {
-            let (_ss, _mu) = Algorithm::FrodoKem976Shake.decapsulate(&sk, &ct);
+            let (_ss, _mu) = Algorithm::FrodoKem976Shake.decapsulate(&sk, &ct).unwrap();
         });
     });
     let kem = safe_oqs::kem::Kem::new(safe_oqs::kem::Algorithm::FrodoKem976Shake).unwrap();
@@ -276,7 +276,7 @@ fn bench_decapsulate<'a, M: Measurement>(group: &mut BenchmarkGroup<'a, M>) {
         .unwrap();
     group.bench_function("Decapsulate 1344Shake", |b| {
         b.iter(|| {
-            let (_ss, _mu) = Algorithm::FrodoKem1344Shake.decapsulate(&sk, &ct);
+            let (_ss, _mu) = Algorithm::FrodoKem1344Shake.decapsulate(&sk, &ct).unwrap();
         });
     });
     let kem = safe_oqs::kem::Kem::new(safe_oqs::kem::Algorithm::FrodoKem1344Shake).unwrap();
