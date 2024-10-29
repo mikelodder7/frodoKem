@@ -43,9 +43,33 @@ macro_rules! from_slice_impl {
     };
 }
 
+macro_rules! serde_impl {
+    ($name:ident) => {
+        #[cfg(feature = "serde")]
+        impl<P: Params> serde::Serialize for $name<P> {
+            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+            where
+                S: serde::Serializer,
+            {
+                serializer.serialize_bytes(&self.0)
+            }
+        }
+
+        #[cfg(feature = "serde")]
+        impl<'de, P: Params> serde::Deserialize<'de> for $name<P> {
+            fn deserialize<D>(deserializer: D) -> Result<$name<P>, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                let bytes = <Vec<u8>>::deserialize(deserializer)?;
+                $name::from_slice(&bytes).map_err(serde::de::Error::custom)
+            }
+        }
+    };
+}
+
 /// A FrodoKEM ciphertext
 #[derive(Clone, Debug, Eq, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Ciphertext<P: Params>(pub(crate) Vec<u8>, pub(crate) PhantomData<P>);
 
 impl<P: Params> AsRef<[u8]> for Ciphertext<P> {
@@ -61,6 +85,8 @@ impl<P: Params> Default for Ciphertext<P> {
 }
 
 from_slice_impl!(Ciphertext);
+
+serde_impl!(Ciphertext);
 
 impl<P: Params> Ciphertext<P> {
     /// Convert a slice of bytes into a ciphertext
@@ -139,7 +165,6 @@ impl<'a, P: Params> CiphertextRef<'a, P> {
 
 /// A FrodoKEM public key
 #[derive(Clone, Debug, Eq, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct PublicKey<P: Params>(pub(crate) Vec<u8>, pub(crate) PhantomData<P>);
 
 impl<P: Params> AsRef<[u8]> for PublicKey<P> {
@@ -167,6 +192,8 @@ impl<'a, P: Params> From<&'a PublicKey<P>> for PublicKeyRef<'a, P> {
 }
 
 from_slice_impl!(PublicKey);
+
+serde_impl!(PublicKey);
 
 impl<P: Params> PublicKey<P> {
     /// Convert a slice of bytes into a public key
@@ -231,7 +258,6 @@ impl<'a, P: Params> PublicKeyRef<'a, P> {
 
 /// A FrodoKEM secret key
 #[derive(Clone, Debug, Eq, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SecretKey<P: Params>(pub(crate) Vec<u8>, pub(crate) PhantomData<P>);
 
 impl<P: Params> AsRef<[u8]> for SecretKey<P> {
@@ -255,6 +281,8 @@ impl<P: Params> Zeroize for SecretKey<P> {
 impl<P: Params> ZeroizeOnDrop for SecretKey<P> {}
 
 from_slice_impl!(SecretKey);
+
+serde_impl!(SecretKey);
 
 impl<P: Params> SecretKey<P> {
     /// Convert a slice of bytes into a secret key
@@ -329,7 +357,6 @@ impl<'a, P: Params> From<&'a SecretKey<P>> for SecretKeyRef<'a, P> {
 
 impl<'a, P: Params> SecretKeyRef<'a, P> {
     /// Create a secret key reference
-    #[allow(dead_code)]
     pub fn from_slice(bytes: &'a [u8]) -> FrodoResult<Self> {
         if bytes.len() != P::SECRET_KEY_LENGTH {
             return Err(Error::InvalidSecretKeyLength(bytes.len()));
@@ -368,7 +395,6 @@ impl<'a, P: Params> SecretKeyRef<'a, P> {
 
 /// A FrodoKEM shared secret
 #[derive(Clone, Debug, Eq, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SharedSecret<P: Params>(pub(crate) Vec<u8>, pub(crate) PhantomData<P>);
 
 impl<P: Params> AsRef<[u8]> for SharedSecret<P> {
@@ -392,6 +418,8 @@ impl<P: Params> Zeroize for SharedSecret<P> {
 impl<P: Params> ZeroizeOnDrop for SharedSecret<P> {}
 
 from_slice_impl!(SharedSecret);
+
+serde_impl!(SharedSecret);
 
 impl<P: Params> SharedSecret<P> {
     /// Convert a slice of bytes into a shared secret
