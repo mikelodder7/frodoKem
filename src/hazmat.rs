@@ -2,6 +2,10 @@
     Copyright Michael Lodder. All Rights Reserved.
     SPDX-License-Identifier: Apache-2.0
 */
+//! ⚠️ Low-level "hazmat" AES functions.
+//!
+//! # ☢️️ WARNING: HAZARDOUS API ☢️
+//!
 //! This module contains the low-level API for the FrodoKEM algorithm.
 //! Only use if you know what you're doing.
 //!

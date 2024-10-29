@@ -4,7 +4,7 @@
 [![Docs][docs-image]][docs-link]
 [![License][license-image]](LICENSE-APACHE)
 [![Downloads][downloads-image]][crate-link]
-![build](https://github.com/mikelodder7/frodoKem/workflows/frodo-kem/badge.svg?branch=main&event=push)
+![build](https://github.com/mikelodder7/frodoKem/workflows/frodo-kem/badge.svg)
 
 A pure rust implementation of [FrodoKEM Learning with Errors Key Encapsulation](https://frodokem.org/files/FrodoKEM-specification-20210604.pdf).
 
