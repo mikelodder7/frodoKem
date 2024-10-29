@@ -4,7 +4,49 @@
 */
 //! ## Usage
 //!
+//! The standard safe method to use FrodoKEM is to use the [`Algorithm`]
+//! enum to select the desired algorithm then encapsulate a randomly generated
+//! value, and decapsulate it on the other side.
 //!
+//! ```
+//! use frodo_kem_rs::Algorithm;
+//! use rand_core::OsRng;
+//!
+//! let alg = Algorithm::FrodoKem640Shake;
+//! let (pk, sk) = alg.generate_keypair(OsRng);
+//! let (ct, enc_ss) = alg.encapsulate_with_rng(&pk, OsRng).unwrap();
+//! let (dec_ss, msg) = alg.decapsulate(&sk, &ct).unwrap();
+//!
+//! assert_eq!(enc_ss, dec_ss);
+//! ```
+//! If the message to be encapsulated is known, it can be passed to the encapsulate method.
+//! `encapsulate` will error if the message is not the correct size.
+//!
+//! ```
+//! use frodo_kem_rs::Algorithm;
+//! use rand_core::OsRng;
+//!
+//! let alg = Algorithm::FrodoKem1344Shake;
+//! let (pk, sk) = alg.generate_keypair(OsRng);
+//! // Top secret don't disclose
+//! let aes_256_key = [3u8; 32];
+//! let (ct, enc_ss) = alg.encapsulate(&pk, &aes_256_key).unwrap();
+//! let (dec_ss, dec_msg) = alg.decapsulate(&sk, &ct).unwrap();
+//!
+//! assert_eq!(enc_ss, dec_ss);
+//! assert_eq!(&aes_256_key[..], dec_msg.as_slice());
+//! ```
+//!
+//! ## Features
+//! Each algorithm can be conditionally included/excluded as needed.
+//!
+//! The structs used in this crate all optionally support the `serde` feature.
+//!
+//! ## Custom
+//!
+//! To create a custom implementation of FrodoKEM, use the `hazmat` feature, to enable
+//! the necessary traits for creating a custom implementation. Be warned, this is not
+//! recommended unless you are sure of what you are doing.
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
 #![warn(
     clippy::mod_module_files,

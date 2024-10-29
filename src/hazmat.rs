@@ -4,6 +4,28 @@
 */
 //! This module contains the low-level API for the FrodoKEM algorithm.
 //! Only use if you know what you're doing.
+//!
+//! This layer provides several traits for mixing and matching FrodoKEM components:
+//!
+//! [`Params`] for specifying the constant parameters of the FrodoKEM algorithm.
+//! [`Expanded`] for specifying the expand seed A method.
+//! [`Sample`] for specifying the noise sampling method.
+//! [`Kem`] encompasses the entire FrodoKEM algorithm and each function can be overridden.
+//!
+//! There are default implementations for each of these traits that can be used to create a FrodoKEM instance.
+//!
+//! There are:
+//! [`Frodo640`], [`Frodo976`], and [`Frodo1344`] for the FrodoKEM parameter sets.
+//! [`FrodoAes`] and [`FrodoShake`] for the expand seed A methods.
+//! [`FrodoCdfSample`] for the noise sampling method.
+//!
+//! [`FrodoKem`] is the default implementation of the FrodoKEM algorithm that combines
+//! all of the above traits using generics.
+//!
+//! There are also type aliases for each standardized FrodoKEM algorithm:
+//!
+//! [`FrodoKem640Aes`], [`FrodoKem976Aes`], and [`FrodoKem1344Aes`] for the FrodoKEM-AES algorithms.
+//! [`FrodoKem640Shake`], [`FrodoKem976Shake`], and [`FrodoKem1344Shake`] for the FrodoKEM-SHAKE algorithms.
 mod models;
 mod traits;
 
