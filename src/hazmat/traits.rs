@@ -109,7 +109,7 @@ pub trait Kem: Params + Expanded + Sample {
 
     /// Generate a keypair
     ///
-    /// See Algorithm 9 in [spec](https://frodokem.org/files/FrodoKEM-specification-20210604.pdf).
+    /// See Algorithm 12 in [spec](https://frodokem.org/files/FrodoKEM-specification-20210604.pdf).
     fn generate_keypair(
         &self,
         mut rng: impl CryptoRngCore,
@@ -179,7 +179,7 @@ pub trait Kem: Params + Expanded + Sample {
 
     /// Encapsulate a random message into a ciphertext.
     ///
-    /// See Algorithm 10 in the [spec](https://frodokem.org/files/FrodoKEM-specification-20210604.pdf).
+    /// See Algorithm 13 in the [spec](https://frodokem.org/files/FrodoKEM-specification-20210604.pdf).
     fn encapsulate_with_rng<'a, P: Into<EncryptionKeyRef<'a, Self>>>(
         &self,
         public_key: P,
@@ -194,7 +194,7 @@ pub trait Kem: Params + Expanded + Sample {
 
     /// Encapsulate a message into a ciphertext.
     ///
-    /// See Algorithm 10 in the [spec](https://frodokem.org/files/FrodoKEM-specification-20210604.pdf).
+    /// See Algorithm 13 in the [spec](https://frodokem.org/files/FrodoKEM-specification-20210604.pdf).
     fn encapsulate<'a, P: Into<EncryptionKeyRef<'a, Self>>>(
         &self,
         public_key: P,
@@ -267,7 +267,7 @@ pub trait Kem: Params + Expanded + Sample {
 
     /// Decapsulate the ciphertext into a shared secret.
     ///
-    /// See Algorithm 11 in the [spec](https://frodokem.org/files/FrodoKEM-specification-20210604.pdf).
+    /// See Algorithm 14 in the [spec](https://frodokem.org/files/FrodoKEM-specification-20210604.pdf).
     fn decapsulate<
         'a,
         'b,
