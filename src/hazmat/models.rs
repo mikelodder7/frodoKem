@@ -51,7 +51,7 @@ macro_rules! serde_impl {
             where
                 S: serde::Serializer,
             {
-                serializer.serialize_bytes(&self.0)
+                serdect::slice::serialize_hex_lower_or_bin(&self.0, serializer)
             }
         }
 
@@ -61,7 +61,7 @@ macro_rules! serde_impl {
             where
                 D: serde::Deserializer<'de>,
             {
-                let bytes = <Vec<u8>>::deserialize(deserializer)?;
+                let bytes = serdect::slice::deserialize_hex_or_bin_vec(deserializer)?;
                 $name::from_slice(&bytes).map_err(serde::de::Error::custom)
             }
         }
@@ -111,12 +111,23 @@ impl<P: Params> Ciphertext<P> {
     /// Returns a reference to the c2 component
     #[allow(dead_code)]
     pub fn c2(&self) -> &[u8] {
-        &self.0[P::LOG_Q_X_N_X_N_BAR_DIV_8..]
+        &self.0[P::LOG_Q_X_N_X_N_BAR_DIV_8..P::CIPHERTEXT_LENGTH - P::BYTES_SALT]
     }
 
     /// Returns a mutable reference to the c2 component
     pub fn c2_mut(&mut self) -> &mut [u8] {
-        &mut self.0[P::LOG_Q_X_N_X_N_BAR_DIV_8..]
+        &mut self.0[P::LOG_Q_X_N_X_N_BAR_DIV_8..P::CIPHERTEXT_LENGTH - P::BYTES_SALT]
+    }
+
+    /// Returns a reference to the salt
+    #[allow(dead_code)]
+    pub fn salt(&self) -> &[u8] {
+        &self.0[P::CIPHERTEXT_LENGTH - P::BYTES_SALT..]
+    }
+
+    /// Returns a mutable reference to the salt
+    pub fn salt_mut(&mut self) -> &mut [u8] {
+        &mut self.0[P::CIPHERTEXT_LENGTH - P::BYTES_SALT..]
     }
 }
 
@@ -153,7 +164,12 @@ impl<'a, P: Params> CiphertextRef<'a, P> {
 
     /// Returns a reference to the c2 component
     pub fn c2(&self) -> &[u8] {
-        &self.0[P::LOG_Q_X_N_X_N_BAR_DIV_8..]
+        &self.0[P::LOG_Q_X_N_X_N_BAR_DIV_8..P::CIPHERTEXT_LENGTH - P::BYTES_SALT]
+    }
+
+    /// Returns a reference to the salt
+    pub fn salt(&self) -> &[u8] {
+        &self.0[P::CIPHERTEXT_LENGTH - P::BYTES_SALT..]
     }
 
     /// Convert the ciphertext reference into an owned ciphertext
@@ -464,11 +480,27 @@ impl<'a, P: Params> SharedSecretRef<'a, P> {
     }
 }
 
+#[cfg(any(
+    feature = "frodo640aes",
+    feature = "frodo976aes",
+    feature = "frodo1344aes",
+    feature = "frodo640shake",
+    feature = "frodo976shake",
+    feature = "frodo1344shake",
+))]
 /// The FrodoKEM scheme
 #[derive(Copy, Clone, Default, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct FrodoKem<P: Params, E: Expanded, S: Sample>(pub PhantomData<(P, E, S)>);
 
+#[cfg(any(
+    feature = "frodo640aes",
+    feature = "frodo976aes",
+    feature = "frodo1344aes",
+    feature = "frodo640shake",
+    feature = "frodo976shake",
+    feature = "frodo1344shake",
+))]
 impl<P: Params, E: Expanded, S: Sample> Params for FrodoKem<P, E, S> {
     type Shake = P::Shake;
     const N: usize = P::N;
@@ -477,8 +509,18 @@ impl<P: Params, E: Expanded, S: Sample> Params for FrodoKem<P, E, S> {
     const CDF_TABLE: &'static [u16] = P::CDF_TABLE;
     const CLAIMED_NIST_LEVEL: usize = P::CLAIMED_NIST_LEVEL;
     const SHARED_SECRET_LENGTH: usize = P::SHARED_SECRET_LENGTH;
+    const BYTES_SEED_SE: usize = P::BYTES_SEED_SE;
+    const BYTES_SALT: usize = P::BYTES_SALT;
 }
 
+#[cfg(any(
+    feature = "frodo640aes",
+    feature = "frodo976aes",
+    feature = "frodo1344aes",
+    feature = "frodo640shake",
+    feature = "frodo976shake",
+    feature = "frodo1344shake",
+))]
 impl<P: Params, E: Expanded, S: Sample> Expanded for FrodoKem<P, E, S> {
     const METHOD: &'static str = E::METHOD;
     fn expand_a(&self, seed_a: &[u8], a: &mut [u16]) {
@@ -486,23 +528,120 @@ impl<P: Params, E: Expanded, S: Sample> Expanded for FrodoKem<P, E, S> {
     }
 }
 
+#[cfg(any(
+    feature = "frodo640aes",
+    feature = "frodo976aes",
+    feature = "frodo1344aes",
+    feature = "frodo640shake",
+    feature = "frodo976shake",
+    feature = "frodo1344shake",
+))]
 impl<P: Params, E: Expanded, S: Sample> Sample for FrodoKem<P, E, S> {
     fn sample(&self, s: &mut [u16]) {
         S::sample(&S::default(), s)
     }
 }
 
-impl<P: Params, E: Expanded, S: Sample> Kem for FrodoKem<P, E, S> {}
+#[cfg(any(
+    feature = "frodo640aes",
+    feature = "frodo976aes",
+    feature = "frodo1344aes",
+    feature = "frodo640shake",
+    feature = "frodo976shake",
+    feature = "frodo1344shake",
+))]
+impl<P: Params, E: Expanded, S: Sample> Kem for FrodoKem<P, E, S> {
+    const NAME: &'static str = "FrodoKEM";
+}
 
-#[cfg(any(feature = "frodo640aes", feature = "frodo640shake"))]
-/// Frodo640 parameters
+#[cfg(any(
+    feature = "efrodo640aes",
+    feature = "efrodo976aes",
+    feature = "efrodo1344aes",
+    feature = "efrodo640shake",
+    feature = "efrodo976shake",
+    feature = "efrodo1344shake",
+))]
 #[derive(Copy, Clone, Default, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct Frodo640;
+pub struct EphemeralFrodoKem<P: Params, E: Expanded, S: Sample>(pub PhantomData<(P, E, S)>);
 
-#[cfg(any(feature = "frodo640aes", feature = "frodo640shake"))]
-impl Params for Frodo640 {
-    type Shake = sha3::Shake128;
+#[cfg(any(
+    feature = "efrodo640aes",
+    feature = "efrodo976aes",
+    feature = "efrodo1344aes",
+    feature = "efrodo640shake",
+    feature = "efrodo976shake",
+    feature = "efrodo1344shake",
+))]
+impl<P: Params, E: Expanded, S: Sample> Params for EphemeralFrodoKem<P, E, S> {
+    type Shake = P::Shake;
+    const N: usize = P::N;
+    const LOG_Q: usize = P::LOG_Q;
+    const EXTRACTED_BITS: usize = P::EXTRACTED_BITS;
+    const CDF_TABLE: &'static [u16] = P::CDF_TABLE;
+    const CLAIMED_NIST_LEVEL: usize = P::CLAIMED_NIST_LEVEL;
+    const SHARED_SECRET_LENGTH: usize = P::SHARED_SECRET_LENGTH;
+    const BYTES_SEED_SE: usize = P::BYTES_SEED_SE;
+    const BYTES_SALT: usize = P::BYTES_SALT;
+}
+
+#[cfg(any(
+    feature = "efrodo640aes",
+    feature = "efrodo976aes",
+    feature = "efrodo1344aes",
+    feature = "efrodo640shake",
+    feature = "efrodo976shake",
+    feature = "efrodo1344shake",
+))]
+impl<P: Params, E: Expanded, S: Sample> Expanded for EphemeralFrodoKem<P, E, S> {
+    const METHOD: &'static str = E::METHOD;
+    fn expand_a(&self, seed_a: &[u8], a: &mut [u16]) {
+        E::expand_a(&E::default(), seed_a, a)
+    }
+}
+
+#[cfg(any(
+    feature = "efrodo640aes",
+    feature = "efrodo976aes",
+    feature = "efrodo1344aes",
+    feature = "efrodo640shake",
+    feature = "efrodo976shake",
+    feature = "efrodo1344shake",
+))]
+impl<P: Params, E: Expanded, S: Sample> Sample for EphemeralFrodoKem<P, E, S> {
+    fn sample(&self, s: &mut [u16]) {
+        S::sample(&S::default(), s)
+    }
+}
+
+#[cfg(any(
+    feature = "efrodo640aes",
+    feature = "efrodo976aes",
+    feature = "efrodo1344aes",
+    feature = "efrodo640shake",
+    feature = "efrodo976shake",
+    feature = "efrodo1344shake",
+))]
+impl<P: Params, E: Expanded, S: Sample> Kem for EphemeralFrodoKem<P, E, S> {
+    const NAME: &'static str = "eFrodoKEM";
+}
+
+#[cfg(any(
+    feature = "efrodo640aes",
+    feature = "frodo640aes",
+    feature = "efrodo640shake",
+    feature = "frodo640shake",
+))]
+struct InnerFrodo640;
+
+#[cfg(any(
+    feature = "efrodo640aes",
+    feature = "frodo640aes",
+    feature = "efrodo640shake",
+    feature = "frodo640shake",
+))]
+impl InnerFrodo640 {
     const N: usize = 640;
     const LOG_Q: usize = 15;
     const EXTRACTED_BITS: usize = 2;
@@ -513,15 +652,57 @@ impl Params for Frodo640 {
     const SHARED_SECRET_LENGTH: usize = 16;
 }
 
-#[cfg(any(feature = "frodo976aes", feature = "frodo976shake"))]
-/// Frodo976 parameters
+#[cfg(any(feature = "frodo640aes", feature = "frodo640shake",))]
+/// Frodo640 parameters
 #[derive(Copy, Clone, Default, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct Frodo976;
+pub struct Frodo640;
 
-#[cfg(any(feature = "frodo976aes", feature = "frodo976shake"))]
-impl Params for Frodo976 {
-    type Shake = sha3::Shake256;
+#[cfg(any(feature = "frodo640aes", feature = "frodo640shake",))]
+impl Params for Frodo640 {
+    type Shake = sha3::Shake128;
+    const N: usize = InnerFrodo640::N;
+    const LOG_Q: usize = InnerFrodo640::LOG_Q;
+    const EXTRACTED_BITS: usize = InnerFrodo640::EXTRACTED_BITS;
+    const CDF_TABLE: &'static [u16] = InnerFrodo640::CDF_TABLE;
+    const CLAIMED_NIST_LEVEL: usize = InnerFrodo640::CLAIMED_NIST_LEVEL;
+    const SHARED_SECRET_LENGTH: usize = InnerFrodo640::SHARED_SECRET_LENGTH;
+}
+
+#[cfg(any(feature = "efrodo640aes", feature = "efrodo640shake",))]
+/// Frodo640 parameters
+#[derive(Copy, Clone, Default, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct EphemeralFrodo640;
+
+#[cfg(any(feature = "efrodo640aes", feature = "efrodo640shake",))]
+impl Params for EphemeralFrodo640 {
+    type Shake = sha3::Shake128;
+    const N: usize = InnerFrodo640::N;
+    const LOG_Q: usize = InnerFrodo640::LOG_Q;
+    const EXTRACTED_BITS: usize = InnerFrodo640::EXTRACTED_BITS;
+    const CDF_TABLE: &'static [u16] = InnerFrodo640::CDF_TABLE;
+    const CLAIMED_NIST_LEVEL: usize = InnerFrodo640::CLAIMED_NIST_LEVEL;
+    const SHARED_SECRET_LENGTH: usize = InnerFrodo640::SHARED_SECRET_LENGTH;
+    const BYTES_SEED_SE: usize = Self::SHARED_SECRET_LENGTH;
+    const BYTES_SALT: usize = 0;
+}
+
+#[cfg(any(
+    feature = "efrodo976aes",
+    feature = "frodo976aes",
+    feature = "efrodo976shake",
+    feature = "frodo976shake",
+))]
+struct InnerFrodo976;
+
+#[cfg(any(
+    feature = "efrodo976aes",
+    feature = "frodo976aes",
+    feature = "efrodo976shake",
+    feature = "frodo976shake",
+))]
+impl InnerFrodo976 {
     const N: usize = 976;
     const LOG_Q: usize = 16;
     const EXTRACTED_BITS: usize = 3;
@@ -532,15 +713,57 @@ impl Params for Frodo976 {
     const SHARED_SECRET_LENGTH: usize = 24;
 }
 
-#[cfg(any(feature = "frodo1344aes", feature = "frodo1344shake"))]
-/// Frodo1344 parameters
+#[cfg(any(feature = "frodo976aes", feature = "frodo976shake",))]
+/// Frodo976 parameters
 #[derive(Copy, Clone, Default, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct Frodo1344;
+pub struct Frodo976;
 
-#[cfg(any(feature = "frodo1344aes", feature = "frodo1344shake"))]
-impl Params for Frodo1344 {
+#[cfg(any(feature = "frodo976aes", feature = "frodo976shake",))]
+impl Params for Frodo976 {
     type Shake = sha3::Shake256;
+    const N: usize = InnerFrodo976::N;
+    const LOG_Q: usize = InnerFrodo976::LOG_Q;
+    const EXTRACTED_BITS: usize = InnerFrodo976::EXTRACTED_BITS;
+    const CDF_TABLE: &'static [u16] = InnerFrodo976::CDF_TABLE;
+    const CLAIMED_NIST_LEVEL: usize = InnerFrodo976::CLAIMED_NIST_LEVEL;
+    const SHARED_SECRET_LENGTH: usize = InnerFrodo976::SHARED_SECRET_LENGTH;
+}
+
+#[cfg(any(feature = "efrodo976aes", feature = "efrodo976shake",))]
+/// Frodo976 parameters
+#[derive(Copy, Clone, Default, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct EphemeralFrodo976;
+
+#[cfg(any(feature = "efrodo976aes", feature = "efrodo976shake",))]
+impl Params for EphemeralFrodo976 {
+    type Shake = sha3::Shake256;
+    const N: usize = InnerFrodo976::N;
+    const LOG_Q: usize = InnerFrodo976::LOG_Q;
+    const EXTRACTED_BITS: usize = InnerFrodo976::EXTRACTED_BITS;
+    const CDF_TABLE: &'static [u16] = InnerFrodo976::CDF_TABLE;
+    const CLAIMED_NIST_LEVEL: usize = InnerFrodo976::CLAIMED_NIST_LEVEL;
+    const SHARED_SECRET_LENGTH: usize = InnerFrodo976::SHARED_SECRET_LENGTH;
+    const BYTES_SEED_SE: usize = InnerFrodo976::SHARED_SECRET_LENGTH;
+    const BYTES_SALT: usize = 0;
+}
+
+#[cfg(any(
+    feature = "efrodo1344aes",
+    feature = "frodo1344aes",
+    feature = "efrodo1344shake",
+    feature = "frodo1344shake",
+))]
+struct InnerFrodo1344;
+
+#[cfg(any(
+    feature = "efrodo1344aes",
+    feature = "frodo1344aes",
+    feature = "efrodo1344shake",
+    feature = "frodo1344shake",
+))]
+impl InnerFrodo1344 {
     const N: usize = 1344;
     const LOG_Q: usize = 16;
     const EXTRACTED_BITS: usize = 4;
@@ -549,10 +772,49 @@ impl Params for Frodo1344 {
     const SHARED_SECRET_LENGTH: usize = 32;
 }
 
+#[cfg(any(feature = "frodo1344aes", feature = "frodo1344shake",))]
+/// Frodo1344 parameters
+#[derive(Copy, Clone, Default, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct Frodo1344;
+
+#[cfg(any(feature = "frodo1344aes", feature = "frodo1344shake",))]
+impl Params for Frodo1344 {
+    type Shake = sha3::Shake256;
+    const N: usize = InnerFrodo1344::N;
+    const LOG_Q: usize = InnerFrodo1344::LOG_Q;
+    const EXTRACTED_BITS: usize = InnerFrodo1344::EXTRACTED_BITS;
+    const CDF_TABLE: &'static [u16] = InnerFrodo1344::CDF_TABLE;
+    const CLAIMED_NIST_LEVEL: usize = InnerFrodo1344::CLAIMED_NIST_LEVEL;
+    const SHARED_SECRET_LENGTH: usize = InnerFrodo1344::SHARED_SECRET_LENGTH;
+}
+
+#[cfg(any(feature = "efrodo1344aes", feature = "efrodo1344shake",))]
+/// Frodo1344 parameters
+#[derive(Copy, Clone, Default, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct EphemeralFrodo1344;
+
+#[cfg(any(feature = "efrodo1344aes", feature = "efrodo1344shake",))]
+impl Params for EphemeralFrodo1344 {
+    type Shake = sha3::Shake256;
+    const N: usize = InnerFrodo1344::N;
+    const LOG_Q: usize = InnerFrodo1344::LOG_Q;
+    const EXTRACTED_BITS: usize = InnerFrodo1344::EXTRACTED_BITS;
+    const CDF_TABLE: &'static [u16] = InnerFrodo1344::CDF_TABLE;
+    const CLAIMED_NIST_LEVEL: usize = InnerFrodo1344::CLAIMED_NIST_LEVEL;
+    const SHARED_SECRET_LENGTH: usize = InnerFrodo1344::SHARED_SECRET_LENGTH;
+    const BYTES_SEED_SE: usize = Self::SHARED_SECRET_LENGTH;
+    const BYTES_SALT: usize = 0;
+}
+
 #[cfg(any(
+    feature = "efrodo640aes",
     feature = "frodo640aes",
+    feature = "efrodo976aes",
     feature = "frodo976aes",
-    feature = "frodo1344aes"
+    feature = "efrodo1344aes",
+    feature = "frodo1344aes",
 ))]
 /// Generate matrix A (N x N) column-wise using AES-128
 ///
@@ -597,9 +859,12 @@ impl<P: Params> Expanded for FrodoAes<P> {
 }
 
 #[cfg(any(
+    feature = "efrodo640shake",
     feature = "frodo640shake",
+    feature = "efrodo976shake",
     feature = "frodo976shake",
-    feature = "frodo1344shake"
+    feature = "efrodo1344shake",
+    feature = "frodo1344shake",
 ))]
 /// Generate matrix A (N x N) column-wise using SHAKE-128
 ///
@@ -609,9 +874,12 @@ impl<P: Params> Expanded for FrodoAes<P> {
 pub struct FrodoShake<P: Params>(pub PhantomData<P>);
 
 #[cfg(any(
+    feature = "efrodo640shake",
     feature = "frodo640shake",
+    feature = "efrodo976shake",
     feature = "frodo976shake",
-    feature = "frodo1344shake"
+    feature = "efrodo1344shake",
+    feature = "frodo1344shake",
 ))]
 impl<P: Params> Expanded for FrodoShake<P> {
     const METHOD: &'static str = "SHAKE";

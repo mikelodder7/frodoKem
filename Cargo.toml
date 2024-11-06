@@ -1,7 +1,7 @@
 [package]
 authors = ["Michael Lodder <redmike7@gmail.com>"]
 categories = ["cryptography"]
-description = "A pure rust implementation of FrodoKEM that also includes some experimental features for Zero-Knowledge Proof of Encrypted Correctness"
+description = "A pure rust implementation of FrodoKEM and eFrodoKEM"
 documentation = "https://docs.rs/frodo-kem-rs"
 edition = "2021"
 homepage = "https://github.com/mikelodder7/frodoKem"
@@ -10,17 +10,42 @@ license = "Apache-2.0 OR MIT"
 name = "frodo-kem-rs"
 readme = "README.md"
 repository = "https://github.com/mikelodder7/frodoKem"
-version = "0.2.0"
+version = "0.3.0"
 
 [features]
-default = ["frodo640aes", "frodo640shake", "frodo976aes", "frodo976shake", "frodo1344aes", "frodo1344shake", "serde"]
+default = [
+    "frodo",
+    "efrodo",
+    "serde",
+]
 hazmat = []
-experimental = []
+efrodo = [
+    "efrodo640aes",
+    "efrodo640shake",
+    "efrodo976aes",
+    "efrodo976shake",
+    "efrodo1344aes",
+    "efrodo1344shake",
+]
+frodo = [
+    "frodo640aes",
+    "frodo640shake",
+    "frodo976aes",
+    "frodo976shake",
+    "frodo1344aes",
+    "frodo1344shake",
+]
+efrodo640aes = ["aes"]
 frodo640aes = ["aes"]
+efrodo640shake = []
 frodo640shake = []
+efrodo976aes = ["aes"]
 frodo976aes = ["aes"]
+efrodo976shake = []
 frodo976shake = []
+efrodo1344aes = ["aes"]
 frodo1344aes = ["aes"]
+efrodo1344shake = []
 frodo1344shake = []
 serde = ["hex", "dep:serde"]
 
@@ -29,9 +54,10 @@ aes = { version = "0.8", optional = true }
 hex = { version = "0.4", optional = true }
 rand_core = { version = "0.6", features = ["std"] }
 serde = { version = "1.0", features = ["derive"], optional = true }
+serdect = "0.3.0-rc.0"
 subtle = "2.6"
 sha3 = { version = "0.10" }
-thiserror = "1.0"
+thiserror = "2.0"
 zeroize = "1"
 
 [dev-dependencies]
@@ -48,12 +74,16 @@ serde_yaml = "0.9"
 toml = "0.8"
 
 [package.metadata.docs.rs]
-features = ["frodo640aes", "frodo640shake", "frodo976aes", "frodo976shake", "frodo1344aes", "frodo1344shake", "serde"]
+features = [
+    "frodo",
+    "efrodo",
+    "serde"
+]
 rustdoc-args = ["--cfg", "docsrs"]
 
 [[bench]]
 name = "safe-oqs"
 harness = false
 path = "bench/safe_oqs.rs"
-required-features = ["frodo640aes", "frodo640shake", "frodo976aes", "frodo976shake", "frodo1344aes", "frodo1344shake"]
+required-features = ["efrodo"]
 

@@ -2,18 +2,40 @@
     Copyright Michael Lodder. All Rights Reserved.
     SPDX-License-Identifier: Apache-2.0
 */
-
+use crate::hazmat::{
+    Ciphertext, CiphertextRef, DecryptionKey, DecryptionKeyRef, EncryptionKey, EncryptionKeyRef,
+    SharedSecret,
+};
 use rand_core::CryptoRngCore;
 use sha3::digest::{ExtendableOutput, ExtendableOutputReset, Update, XofReader};
 use subtle::{Choice, ConditionallySelectable};
 use zeroize::Zeroize;
 
-use super::{
-    Ciphertext, CiphertextRef, DecryptionKey, DecryptionKeyRef, EncryptionKey, EncryptionKeyRef,
-    SharedSecret,
-};
+/// Trait for implementing the FrodoKEM sampling algorithm
+///
+/// See Algorithm 5 and 6 in the [spec](https://frodokem.org/files/FrodoKEM-specification-20210604.pdf).
+/// or Algorithm 7.4 and 7.5 in [iso](https://frodokem.org/files/FrodoKEM-standard_proposal-20230314.pdf).
+pub trait Sample: Default {
+    /// The method used to sample.
+    ///
+    /// s is the input that will be modified in place with the noise
+    fn sample(&self, s: &mut [u16]);
+}
 
-/// The FrodoKEM parameters
+/// Trait for implementing equivalents to
+/// Algorithm 7 and 8 in the [spec](https://frodokem.org/files/FrodoKEM-specification-20210604.pdf).
+/// or Algorithm 7.6 in [iso](https://frodokem.org/files/FrodoKEM-standard_proposal-20230314.pdf).
+///
+/// Expand the seed to produce the matrix A
+pub trait Expanded: Default {
+    /// The method used to expand the seed
+    const METHOD: &'static str;
+    /// Expand the seed to produce the matrix A
+    /// Generate matrix A (N x N) column-wise
+    fn expand_a(&self, seed_a: &[u8], a: &mut [u16]);
+}
+
+/// The base FrodoKEM parameters for either eFrodo or Frodo
 pub trait Params: Sized + Default {
     /// The SHAKE method
     type Shake: Default + ExtendableOutput + ExtendableOutputReset + Update;
@@ -40,8 +62,13 @@ pub trait Params: Sized + Default {
     const SHARED_SECRET_LENGTH: usize;
     /// The number of bytes in µ
     const BYTES_MU: usize = (Self::EXTRACTED_BITS * Self::N_BAR_X_N_BAR) / 8;
+    /// The number of bytes in seedSE
+    const BYTES_SEED_SE: usize = 2 * Self::SHARED_SECRET_LENGTH;
+    /// The number of bytes in the salt
+    const BYTES_SALT: usize = 2 * Self::SHARED_SECRET_LENGTH;
     /// = len(s) + len(seedSE) + len(z)
-    const KEY_SEED_SIZE: usize = 2 * Self::SHARED_SECRET_LENGTH + Self::BYTES_SEED_A;
+    const KEY_SEED_SIZE: usize =
+        Self::SHARED_SECRET_LENGTH + Self::BYTES_SEED_A + Self::BYTES_SEED_SE;
     /// 2 * N
     const TWO_N: usize = 2 * Self::N;
     /// 2 + SEED_A
@@ -75,41 +102,19 @@ pub trait Params: Sized + Default {
         + Self::SHARED_SECRET_LENGTH;
     /// The ciphertext length
     const CIPHERTEXT_LENGTH: usize =
-        Self::LOG_Q_X_N_X_N_BAR_DIV_8 + (Self::LOG_Q * Self::N_BAR_X_N_BAR) / 8;
+        Self::LOG_Q_X_N_X_N_BAR_DIV_8 + (Self::LOG_Q * Self::N_BAR_X_N_BAR) / 8 + Self::BYTES_SALT;
 }
 
-/// Trait for implementing the FrodoKEM sampling algorithm
-///
-/// See Algorithm 5 and 6 in the [spec](https://frodokem.org/files/FrodoKEM-specification-20210604.pdf).
-pub trait Sample: Default {
-    /// The method used to sample.
-    ///
-    /// s is the input that will be modified in place with the noise
-    fn sample(&self, s: &mut [u16]);
-}
-
-/// Trait for implementing equivalents to
-/// Algorithm 7 and 8 in the [spec](https://frodokem.org/files/FrodoKEM-specification-20210604.pdf).
-///
-/// Expand the seed to produce the matrix A
-pub trait Expanded: Default {
-    /// The method used to expand the seed
-    const METHOD: &'static str;
-    /// Expand the seed to produce the matrix A
-    /// Generate matrix A (N x N) column-wise
-    fn expand_a(&self, seed_a: &[u8], a: &mut [u16]);
-}
-
-/// Trait for implementing FrodoKem
+/// The base FrodoKEM methods
 pub trait Kem: Params + Expanded + Sample {
-    /// Get the algorithm name
-    fn algorithm(&self) -> String {
-        format!("FrodoKEM-{}-{}", Self::N, Self::METHOD)
-    }
+    /// The name of the frodoKEM algorithm
+    const NAME: &'static str;
 
     /// Generate a keypair
     ///
     /// See Algorithm 12 in [spec](https://frodokem.org/files/FrodoKEM-specification-20210604.pdf).
+    /// Algorithm 8.1 in [iso](https://frodokem.org/files/FrodoKEM-standard_proposal-20230314.pdf).
+    /// Algorithm 1 in [annex](https://frodokem.org/files/FrodoKEM-annex-20230418.pdf)
     fn generate_keypair(
         &self,
         mut rng: impl CryptoRngCore,
@@ -121,9 +126,9 @@ pub trait Kem: Params + Expanded + Sample {
 
         sk.random_s_mut()
             .copy_from_slice(&randomness[..Self::SHARED_SECRET_LENGTH]);
-        let randomness_seed_se =
-            &randomness[Self::SHARED_SECRET_LENGTH..2 * Self::SHARED_SECRET_LENGTH];
-        let randomness_z = &randomness[2 * Self::SHARED_SECRET_LENGTH..];
+        let randomness_seed_se = &randomness
+            [Self::SHARED_SECRET_LENGTH..Self::SHARED_SECRET_LENGTH + Self::BYTES_SEED_SE];
+        let randomness_z = &randomness[Self::SHARED_SECRET_LENGTH + Self::BYTES_SEED_SE..];
 
         let mut shake = Self::Shake::default();
         shake.update(randomness_z);
@@ -180,6 +185,8 @@ pub trait Kem: Params + Expanded + Sample {
     /// Encapsulate a random message into a ciphertext.
     ///
     /// See Algorithm 13 in the [spec](https://frodokem.org/files/FrodoKEM-specification-20210604.pdf).
+    /// Algorithm 8.2 in [iso](https://frodokem.org/files/FrodoKEM-standard_proposal-20230314.pdf).
+    /// Algorithm 2 in [annex](https://frodokem.org/files/FrodoKEM-annex-20230418.pdf)
     fn encapsulate_with_rng<'a, P: Into<EncryptionKeyRef<'a, Self>>>(
         &self,
         public_key: P,
@@ -187,7 +194,7 @@ pub trait Kem: Params + Expanded + Sample {
     ) -> (Ciphertext<Self>, SharedSecret<Self>) {
         let mut mu = vec![0u8; Self::BYTES_MU];
         rng.fill_bytes(&mut mu);
-        let res = self.encapsulate(public_key, &mu);
+        let res = self.encapsulate(public_key, &mu, rng);
         mu.zeroize();
         res
     }
@@ -195,10 +202,13 @@ pub trait Kem: Params + Expanded + Sample {
     /// Encapsulate a message into a ciphertext.
     ///
     /// See Algorithm 13 in the [spec](https://frodokem.org/files/FrodoKEM-specification-20210604.pdf).
+    /// Algorithm 8.2 in [iso](https://frodokem.org/files/FrodoKEM-standard_proposal-20230314.pdf).
+    /// Algorithm 2 in [annex](https://frodokem.org/files/FrodoKEM-annex-20230418.pdf)
     fn encapsulate<'a, P: Into<EncryptionKeyRef<'a, Self>>>(
         &self,
         public_key: P,
         mu: &[u8],
+        mut rng: impl CryptoRngCore,
     ) -> (Ciphertext<Self>, SharedSecret<Self>) {
         assert_eq!(mu.len(), Self::BYTES_MU);
         let public_key = public_key.into();
@@ -206,18 +216,19 @@ pub trait Kem: Params + Expanded + Sample {
         let mut ss = SharedSecret::default();
 
         let mut shake = Self::Shake::default();
-        let mut g2_in = vec![0u8; Self::BYTES_PK_HASH + Self::BYTES_MU];
+        let mut g2_in = vec![0u8; Self::BYTES_PK_HASH + Self::BYTES_MU + Self::BYTES_SALT];
 
         shake.update(public_key.0);
         shake.finalize_xof_reset_into(&mut g2_in[..Self::BYTES_PK_HASH]);
-        g2_in[Self::BYTES_PK_HASH..].copy_from_slice(mu);
-        let mut g2_out = vec![0u8; 2 * Self::SHARED_SECRET_LENGTH];
+        g2_in[Self::BYTES_PK_HASH..Self::BYTES_PK_HASH + Self::BYTES_MU].copy_from_slice(mu);
+        rng.fill_bytes(&mut g2_in[Self::BYTES_PK_HASH + Self::BYTES_MU..]);
+        let mut g2_out = vec![0u8; Self::SHARED_SECRET_LENGTH + Self::BYTES_SEED_SE];
         shake.update(&g2_in);
         shake.finalize_xof_reset_into(&mut g2_out);
 
         let mut sp = vec![0u16; (2 * Self::N + Self::N_BAR) * Self::N_BAR];
         shake.update(&[0x96]);
-        shake.update(&g2_out[..Self::SHARED_SECRET_LENGTH]);
+        shake.update(&g2_out[..Self::BYTES_SEED_SE]);
         let mut shake_reader = shake.finalize_xof_reset();
         let mut u16_buffer = [0u8; 2];
         for b in sp.iter_mut() {
@@ -247,14 +258,20 @@ pub trait Kem: Params + Expanded + Sample {
 
         let mut matrix_c = vec![0u16; Self::N_BAR_X_N_BAR];
 
-        self.encode_message(&g2_in[Self::BYTES_PK_HASH..], &mut matrix_c);
+        self.encode_message(
+            &g2_in[Self::BYTES_PK_HASH..Self::BYTES_PK_HASH + Self::BYTES_MU],
+            &mut matrix_c,
+        );
 
         self.add(&matrix_v, &mut matrix_c);
 
         self.pack(&matrix_c, ct.c2_mut());
 
+        ct.salt_mut()
+            .copy_from_slice(&g2_in[g2_in.len() - Self::BYTES_SALT..]);
+
         shake.update(&ct.0);
-        shake.update(&g2_out[Self::SHARED_SECRET_LENGTH..]);
+        shake.update(&g2_out[Self::BYTES_SEED_SE..]);
         shake.finalize_xof_into(&mut ss.0);
 
         matrix_v.zeroize();
@@ -268,6 +285,8 @@ pub trait Kem: Params + Expanded + Sample {
     /// Decapsulate the ciphertext into a shared secret.
     ///
     /// See Algorithm 14 in the [spec](https://frodokem.org/files/FrodoKEM-specification-20210604.pdf).
+    /// Algorithm 8.3 in [iso](https://frodokem.org/files/FrodoKEM-standard_proposal-20230314.pdf).
+    /// Algorithm 3 in [annex](https://frodokem.org/files/FrodoKEM-annex-20230418.pdf)
     fn decapsulate<
         'a,
         'b,
@@ -305,12 +324,16 @@ pub trait Kem: Params + Expanded + Sample {
         self.mul_bs(&matrix_bp, &matrix_s, &mut matrix_w);
         self.sub(&matrix_c, &mut matrix_w);
 
-        let mut g2_in = vec![0u8; Self::BYTES_PK_HASH + Self::BYTES_MU];
-        let mut g2_out = vec![0u8; 2 * Self::SHARED_SECRET_LENGTH];
+        let mut g2_in = vec![0u8; Self::BYTES_PK_HASH + Self::BYTES_MU + Self::BYTES_SALT];
+        let mut g2_out = vec![0u8; Self::SHARED_SECRET_LENGTH + Self::BYTES_SEED_SE];
 
         g2_in[..Self::BYTES_PK_HASH].copy_from_slice(secret_key.hpk());
         // µ'
-        self.decode_message(&matrix_w, &mut g2_in[Self::BYTES_PK_HASH..]);
+        self.decode_message(
+            &matrix_w,
+            &mut g2_in[Self::BYTES_PK_HASH..Self::BYTES_PK_HASH + Self::BYTES_MU],
+        );
+        g2_in[Self::BYTES_PK_HASH + Self::BYTES_MU..].copy_from_slice(ciphertext.salt());
 
         let mut shake = Self::Shake::default();
         shake.update(&g2_in);
@@ -318,7 +341,7 @@ pub trait Kem: Params + Expanded + Sample {
 
         let mut sp = vec![0u16; (2 * Self::N + Self::N_BAR) * Self::N_BAR];
         shake.update(&[0x96]);
-        shake.update(&g2_out[..Self::SHARED_SECRET_LENGTH]);
+        shake.update(&g2_out[..Self::BYTES_SEED_SE]);
         let mut shake_reader = shake.finalize_xof_reset();
         let mut u16_buffer = [0u8; 2];
         for b in sp.iter_mut() {
@@ -348,7 +371,10 @@ pub trait Kem: Params + Expanded + Sample {
 
         // CC = W + enc(µ') mod q
         let mut matrix_cc = vec![0u16; Self::N_BAR_X_N_BAR];
-        self.encode_message(&g2_in[Self::BYTES_PK_HASH..], &mut matrix_cc);
+        self.encode_message(
+            &g2_in[Self::BYTES_PK_HASH..Self::BYTES_PK_HASH + Self::BYTES_MU],
+            &mut matrix_cc,
+        );
         self.add(&matrix_w, &mut matrix_cc);
 
         shake.update(ciphertext.0);
@@ -363,15 +389,27 @@ pub trait Kem: Params + Expanded + Sample {
         // Take k if choice == 0, otherwise take s
         self.ct_select(
             choice,
-            &g2_out[Self::SHARED_SECRET_LENGTH..],
+            &g2_out[Self::BYTES_SEED_SE..],
             secret_key.random_s(),
             &mut fin_k,
         );
 
         shake.update(&fin_k);
         shake.finalize_xof_into(&mut ss.0);
+        let mu_prime = g2_in[Self::BYTES_PK_HASH..Self::BYTES_PK_HASH + Self::BYTES_MU].to_vec();
 
-        (ss, g2_in[Self::BYTES_PK_HASH..].to_vec())
+        matrix_s.zeroize();
+        matrix_w.zeroize();
+        sp.zeroize();
+        g2_out.zeroize();
+        g2_in[Self::BYTES_PK_HASH..Self::BYTES_PK_HASH + Self::BYTES_MU].zeroize();
+
+        (ss, mu_prime)
+    }
+
+    /// Get the algorithm name
+    fn algorithm(&self) -> String {
+        format!("{}-{}-{}", Self::NAME, Self::N, Self::METHOD)
     }
 
     /// Multiply by s on the right.

@@ -2,7 +2,7 @@
     Copyright Michael Lodder. All Rights Reserved.
     SPDX-License-Identifier: Apache-2.0
 */
-//! ⚠️ Low-level "hazmat" AES functions.
+//! ⚠️ Low-level "hazmat" FrodoKEM and eFrodoKEM functions.
 //!
 //! # ☢️️ WARNING: HAZARDOUS API ☢️
 //!
@@ -60,6 +60,36 @@ pub type FrodoKem976Shake = FrodoKem<Frodo976, FrodoShake<Frodo976>, FrodoCdfSam
 /// The FrodoKEM-1344-SHAKE algorithm
 pub type FrodoKem1344Shake = FrodoKem<Frodo1344, FrodoShake<Frodo1344>, FrodoCdfSample<Frodo1344>>;
 
+#[cfg(feature = "efrodo640aes")]
+/// The eFrodoKEM-640-AES algorithm
+pub type EphemeralFrodoKem640Aes =
+    EphemeralFrodoKem<EphemeralFrodo640, FrodoAes<Frodo640>, FrodoCdfSample<Frodo640>>;
+
+#[cfg(feature = "efrodo976aes")]
+/// The eFrodoKEM-976-AES algorithm
+pub type EphemeralFrodoKem976Aes =
+    EphemeralFrodoKem<EphemeralFrodo976, FrodoAes<Frodo976>, FrodoCdfSample<Frodo976>>;
+
+#[cfg(feature = "efrodo1344aes")]
+/// The eFrodoKEM-1344-AES algorithm
+pub type EphemeralFrodoKem1344Aes =
+    EphemeralFrodoKem<EphemeralFrodo1344, FrodoAes<Frodo1344>, FrodoCdfSample<Frodo1344>>;
+
+#[cfg(feature = "efrodo640shake")]
+/// The eFrodoKEM-640-SHAKE algorithm
+pub type EphemeralFrodoKem640Shake =
+    EphemeralFrodoKem<EphemeralFrodo640, FrodoShake<Frodo640>, FrodoCdfSample<Frodo640>>;
+
+#[cfg(feature = "efrodo976shake")]
+/// The eFrodoKEM-976-SHAKE algorithm
+pub type EphemeralFrodoKem976Shake =
+    EphemeralFrodoKem<EphemeralFrodo976, FrodoShake<Frodo976>, FrodoCdfSample<Frodo976>>;
+
+#[cfg(feature = "efrodo1344shake")]
+/// The eFrodoKEM-1344-SHAKE algorithm
+pub type EphemeralFrodoKem1344Shake =
+    EphemeralFrodoKem<EphemeralFrodo1344, FrodoShake<Frodo1344>, FrodoCdfSample<Frodo1344>>;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -68,55 +98,64 @@ mod tests {
 
     #[test]
     fn parameter_calculations() {
-        assert_eq!(FrodoKem640Shake::N, 640);
-        assert_eq!(FrodoKem640Shake::N_BAR, 8);
-        assert_eq!(FrodoKem640Shake::LOG_Q, 15);
-        assert_eq!(FrodoKem640Shake::EXTRACTED_BITS, 2);
-        assert_eq!(FrodoKem640Shake::STRIPE_STEP, 8);
-        assert_eq!(FrodoKem640Shake::BYTES_SEED_A, 16);
-        assert_eq!(FrodoKem640Shake::BYTES_MU, 16);
-        assert_eq!(FrodoKem640Shake::BYTES_PK_HASH, 16);
+        assert_eq!(EphemeralFrodoKem640Shake::N, 640);
+        assert_eq!(EphemeralFrodoKem640Shake::N_BAR, 8);
+        assert_eq!(EphemeralFrodoKem640Shake::LOG_Q, 15);
+        assert_eq!(EphemeralFrodoKem640Shake::EXTRACTED_BITS, 2);
+        assert_eq!(EphemeralFrodoKem640Shake::STRIPE_STEP, 8);
+        assert_eq!(EphemeralFrodoKem640Shake::BYTES_SEED_A, 16);
+        assert_eq!(EphemeralFrodoKem640Shake::BYTES_MU, 16);
+        assert_eq!(EphemeralFrodoKem640Shake::BYTES_PK_HASH, 16);
         assert_eq!(
-            FrodoKem640Shake::CDF_TABLE,
+            EphemeralFrodoKem640Shake::CDF_TABLE,
             &[
                 4643, 13363, 20579, 25843, 29227, 31145, 32103, 32525, 32689, 32745, 32762, 32766,
                 32767
             ]
         );
-        assert_eq!(FrodoKem640Shake::CLAIMED_NIST_LEVEL, 1);
-        assert_eq!(FrodoKem640Shake::SHARED_SECRET_LENGTH, 16);
-        assert_eq!(FrodoKem640Shake::METHOD, "SHAKE");
-        assert_eq!(FrodoKem640Shake::KEY_SEED_SIZE, 48);
-        assert_eq!(FrodoKem640Shake::TWO_N, 1280);
-        assert_eq!(FrodoKem640Shake::TWO_PLUS_BYTES_SEED_A, 18);
-        assert_eq!(FrodoKem640Shake::N_X_N, 409600);
-        assert_eq!(FrodoKem640Shake::N_X_N_BAR, 5120);
-        assert_eq!(FrodoKem640Shake::N_BAR_X_N, 5120);
-        assert_eq!(FrodoKem640Shake::N_BAR_X_N_BAR, 64);
-        assert_eq!(FrodoKem640Shake::TWO_N_X_N_BAR, 10240);
-        assert_eq!(FrodoKem640Shake::EXTRACTED_BITS_MASK, 3);
-        assert_eq!(FrodoKem640Shake::SHIFT, 13);
-        assert_eq!(FrodoKem640Shake::Q, 0x8000);
-        assert_eq!(FrodoKem640Shake::Q_MASK, 0x7FFF);
-        assert_eq!(FrodoKem640Shake::PUBLIC_KEY_LENGTH, 9616);
-        assert_eq!(FrodoKem640Shake::SECRET_KEY_LENGTH, 19888);
-        assert_eq!(FrodoKem640Shake::CIPHERTEXT_LENGTH, 9720);
+        assert_eq!(EphemeralFrodoKem640Shake::CLAIMED_NIST_LEVEL, 1);
+        assert_eq!(EphemeralFrodoKem640Shake::SHARED_SECRET_LENGTH, 16);
+        assert_eq!(EphemeralFrodoKem640Shake::METHOD, "SHAKE");
+        assert_eq!(EphemeralFrodoKem640Shake::KEY_SEED_SIZE, 48);
+        assert_eq!(EphemeralFrodoKem640Shake::TWO_N, 1280);
+        assert_eq!(EphemeralFrodoKem640Shake::TWO_PLUS_BYTES_SEED_A, 18);
+        assert_eq!(EphemeralFrodoKem640Shake::N_X_N, 409600);
+        assert_eq!(EphemeralFrodoKem640Shake::N_X_N_BAR, 5120);
+        assert_eq!(EphemeralFrodoKem640Shake::N_BAR_X_N, 5120);
+        assert_eq!(EphemeralFrodoKem640Shake::N_BAR_X_N_BAR, 64);
+        assert_eq!(EphemeralFrodoKem640Shake::TWO_N_X_N_BAR, 10240);
+        assert_eq!(EphemeralFrodoKem640Shake::EXTRACTED_BITS_MASK, 3);
+        assert_eq!(EphemeralFrodoKem640Shake::SHIFT, 13);
+        assert_eq!(EphemeralFrodoKem640Shake::Q, 0x8000);
+        assert_eq!(EphemeralFrodoKem640Shake::Q_MASK, 0x7FFF);
+        assert_eq!(EphemeralFrodoKem640Shake::PUBLIC_KEY_LENGTH, 9616);
+        assert_eq!(EphemeralFrodoKem640Shake::SECRET_KEY_LENGTH, 19888);
+        assert_eq!(EphemeralFrodoKem640Shake::CIPHERTEXT_LENGTH, 9720);
     }
 
     #[rstest]
-    #[case::aes640(FrodoKem640Aes::default(), safe_oqs::kem::Algorithm::FrodoKem640Aes)]
+    #[case::aes640(
+        EphemeralFrodoKem640Aes::default(),
+        safe_oqs::kem::Algorithm::FrodoKem640Aes
+    )]
     #[case::shake640(
-        FrodoKem640Shake::default(),
+        EphemeralFrodoKem640Shake::default(),
         safe_oqs::kem::Algorithm::FrodoKem640Shake
     )]
-    #[case::aes976(FrodoKem976Aes::default(), safe_oqs::kem::Algorithm::FrodoKem976Aes)]
+    #[case::aes976(
+        EphemeralFrodoKem976Aes::default(),
+        safe_oqs::kem::Algorithm::FrodoKem976Aes
+    )]
     #[case::shake976(
-        FrodoKem976Shake::default(),
+        EphemeralFrodoKem976Shake::default(),
         safe_oqs::kem::Algorithm::FrodoKem976Shake
     )]
-    #[case::aes1344(FrodoKem1344Aes::default(), safe_oqs::kem::Algorithm::FrodoKem1344Aes)]
+    #[case::aes1344(
+        EphemeralFrodoKem1344Aes::default(),
+        safe_oqs::kem::Algorithm::FrodoKem1344Aes
+    )]
     #[case::shake1344(
-        FrodoKem1344Shake::default(),
+        EphemeralFrodoKem1344Shake::default(),
         safe_oqs::kem::Algorithm::FrodoKem1344Shake
     )]
     fn liboqs_compatibility<F: Kem>(#[case] kem: F, #[case] alg: safe_oqs::kem::Algorithm) {
@@ -143,19 +182,28 @@ mod tests {
     }
 
     #[rstest]
-    #[case::aes640(FrodoKem640Aes::default(), safe_oqs::kem::Algorithm::FrodoKem640Aes)]
+    #[case::aes640(
+        EphemeralFrodoKem640Aes::default(),
+        safe_oqs::kem::Algorithm::FrodoKem640Aes
+    )]
     #[case::shake640(
-        FrodoKem640Shake::default(),
+        EphemeralFrodoKem640Shake::default(),
         safe_oqs::kem::Algorithm::FrodoKem640Shake
     )]
-    #[case::aes976(FrodoKem976Aes::default(), safe_oqs::kem::Algorithm::FrodoKem976Aes)]
+    #[case::aes976(
+        EphemeralFrodoKem976Aes::default(),
+        safe_oqs::kem::Algorithm::FrodoKem976Aes
+    )]
     #[case::shake976(
-        FrodoKem976Shake::default(),
+        EphemeralFrodoKem976Shake::default(),
         safe_oqs::kem::Algorithm::FrodoKem976Shake
     )]
-    #[case::aes1344(FrodoKem1344Aes::default(), safe_oqs::kem::Algorithm::FrodoKem1344Aes)]
+    #[case::aes1344(
+        EphemeralFrodoKem1344Aes::default(),
+        safe_oqs::kem::Algorithm::FrodoKem1344Aes
+    )]
     #[case::shake1344(
-        FrodoKem1344Shake::default(),
+        EphemeralFrodoKem1344Shake::default(),
         safe_oqs::kem::Algorithm::FrodoKem1344Shake
     )]
     fn generate_keypair_compatibility<F: Kem>(
@@ -179,19 +227,28 @@ mod tests {
     }
 
     #[rstest]
-    #[case::aes640(FrodoKem640Aes::default(), safe_oqs::kem::Algorithm::FrodoKem640Aes)]
+    #[case::aes640(
+        EphemeralFrodoKem640Aes::default(),
+        safe_oqs::kem::Algorithm::FrodoKem640Aes
+    )]
     #[case::shake640(
-        FrodoKem640Shake::default(),
+        EphemeralFrodoKem640Shake::default(),
         safe_oqs::kem::Algorithm::FrodoKem640Shake
     )]
-    #[case::aes976(FrodoKem976Aes::default(), safe_oqs::kem::Algorithm::FrodoKem976Aes)]
+    #[case::aes976(
+        EphemeralFrodoKem976Aes::default(),
+        safe_oqs::kem::Algorithm::FrodoKem976Aes
+    )]
     #[case::shake976(
-        FrodoKem976Shake::default(),
+        EphemeralFrodoKem976Shake::default(),
         safe_oqs::kem::Algorithm::FrodoKem976Shake
     )]
-    #[case::aes1344(FrodoKem1344Aes::default(), safe_oqs::kem::Algorithm::FrodoKem1344Aes)]
+    #[case::aes1344(
+        EphemeralFrodoKem1344Aes::default(),
+        safe_oqs::kem::Algorithm::FrodoKem1344Aes
+    )]
     #[case::shake1344(
-        FrodoKem1344Shake::default(),
+        EphemeralFrodoKem1344Shake::default(),
         safe_oqs::kem::Algorithm::FrodoKem1344Shake
     )]
     fn encapsulate_compatibility<F: Kem>(#[case] kem: F, #[case] alg: safe_oqs::kem::Algorithm) {
@@ -216,19 +273,28 @@ mod tests {
     }
 
     #[rstest]
-    #[case::aes640(FrodoKem640Aes::default(), safe_oqs::kem::Algorithm::FrodoKem640Aes)]
+    #[case::aes640(
+        EphemeralFrodoKem640Aes::default(),
+        safe_oqs::kem::Algorithm::FrodoKem640Aes
+    )]
     #[case::shake640(
-        FrodoKem640Shake::default(),
+        EphemeralFrodoKem640Shake::default(),
         safe_oqs::kem::Algorithm::FrodoKem640Shake
     )]
-    #[case::aes976(FrodoKem976Aes::default(), safe_oqs::kem::Algorithm::FrodoKem976Aes)]
+    #[case::aes976(
+        EphemeralFrodoKem976Aes::default(),
+        safe_oqs::kem::Algorithm::FrodoKem976Aes
+    )]
     #[case::shake976(
-        FrodoKem976Shake::default(),
+        EphemeralFrodoKem976Shake::default(),
         safe_oqs::kem::Algorithm::FrodoKem976Shake
     )]
-    #[case::aes1344(FrodoKem1344Aes::default(), safe_oqs::kem::Algorithm::FrodoKem1344Aes)]
+    #[case::aes1344(
+        EphemeralFrodoKem1344Aes::default(),
+        safe_oqs::kem::Algorithm::FrodoKem1344Aes
+    )]
     #[case::shake1344(
-        FrodoKem1344Shake::default(),
+        EphemeralFrodoKem1344Shake::default(),
         safe_oqs::kem::Algorithm::FrodoKem1344Shake
     )]
     fn decapsulate_compatibility<F: Kem>(#[case] kem: F, #[case] alg: safe_oqs::kem::Algorithm) {
