@@ -5,8 +5,8 @@
 //! ## Usage
 //!
 //! The standard safe method to use FrodoKEM is to use the [`Algorithm`]
-//! enum to select the desired algorithm then encapsulate a randomly generated
-//! value, and decapsulate it on the other side.
+//! enum to select the desired algorithm, `encapsulate` a randomly generated
+//! value, and `decapsulate` it on the other side.
 //!
 //! ```
 //! use frodo_kem_rs::Algorithm;
@@ -19,8 +19,14 @@
 //!
 //! assert_eq!(enc_ss, dec_ss);
 //! ```
-//! If the message to be encapsulated is known, it can be passed to the encapsulate method.
-//! `encapsulate` will error if the message is not the correct size.
+//! If the `message` to be encapsulated is known, it can be passed to the encapsulate method.
+//! `encapsulate` will error if the `message` is not the correct size. This method also requires
+//! a `salt` for non-ephemeral algorithms.
+//! Ephemeral variants are meant to be used one-time only and thus do not require a `salt`.
+//!
+//! ## ☢️️ WARNING: HAZARDOUS ☢️
+//! It is considered unsafe to use Ephemeral algorithms more than once.
+//! For more information see [ISO Standard Annex](https://frodokem.org/files/FrodoKEM-annex-20230418.pdf).
 //!
 //! ```
 //! use frodo_kem_rs::Algorithm;
@@ -32,6 +38,11 @@
 //! let aes_256_key = [3u8; 32];
 //! let salt = [7u8; 64];
 //! let (ct, enc_ss) = alg.encapsulate(&ek, &aes_256_key, &salt).unwrap();
+//! let (dec_ss, dec_msg) = alg.decapsulate(&dk, &ct).unwrap();
+//!
+//! // Ephemeral method
+//! let alg = Algorithm::EphemeralFrodoKem1344Shake;
+//! let (ct, enc_ss) = alg.encapsulate(&ek, &aes_256_key, &[]).unwrap();
 //! let (dec_ss, dec_msg) = alg.decapsulate(&dk, &ct).unwrap();
 //!
 //! assert_eq!(enc_ss, dec_ss);

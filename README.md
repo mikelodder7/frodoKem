@@ -4,7 +4,8 @@
 [![Docs][docs-image]][docs-link]
 ![Apache2/MIT licensed][license-image]
 [![Downloads][downloads-image]][crate-link]
-![build](https://github.com/mikelodder7/frodoKem/actions/workflows/frodo-kem/badge.svg)
+![build](https://github.com/mikelodder7/frodoKem/actions/workflows/frodo-kem.yml/badge.svg)
+![MSRV][msrv-image]
 
 A pure rust implementation of 
 - [FrodoKEM Learning with Errors Key Encapsulation](https://frodokem.org/files/FrodoKEM-specification-20210604.pdf).
@@ -15,25 +16,42 @@ It's submission was included in NIST's PQ Round 3 competition.
 
 ## ⚠️ Security Warning
 
+This crate has been tested against the test vectors provided by the FrodoKEM team
+and been rigorously tested for correctness, performance, and security. It has 
+also been tested against opensafequatum's liboqs library to compatibility and correctness.
+
 The implementation contained in this crate has never been independently audited!
 
 USE AT YOUR OWN RISK!
 
 ## Minimum Supported Rust Version
 
-This crate requires **Rust 1.81** at a minimum.
+This crate requires **Rust 1.82** at a minimum.
 
 We may change the MSRV in the future, but it will be accompanied by a minor
 version bump.
 
 ## Details
 
-This code implements
+This crate provides the following FrodoKEM algorithms:
 
-- FrodoKEM-640 with AES and SHAKE.
-- FrodoKEM-976 with AES and SHAKE.
-- FrodoKEM-1344 with AES and SHAKE.
-- The ephemeral counter-parts
+- [x] FrodoKEM-640-AES ✅
+- [x] FrodoKEM-976-AES ✅
+- [x] FrodoKEM-1344-AES ✅
+- [x] FrodoKEM-640-SHAKE ✅
+- [x] FrodoKEM-976-SHAKE ✅
+- [x] FrodoKEM-1344-SHAKE ✅
+- [x] eFrodoKEM-640-AES ✅
+- [x] eFrodoKEM-976-AES ✅
+- [x] eFrodoKEM-1344-AES ✅
+- [x] eFrodoKEM-640-SHAKE ✅
+- [x] eFrodoKEM-976-SHAKE ✅
+- [x] eFrodoKEM-1344-SHAKE ✅
+
+eFrodoKEM is a variant of FrodoKEM that is meant to be used one-time only. Using more than once
+is considered a security risk.
+
+When in doubt use the FrodoKEM algorithm variants.
 
 ## Future work
 
@@ -63,3 +81,4 @@ conditions.
 [docs-link]: https://docs.rs/frodo-kem-rs/
 [license-image]: https://img.shields.io/badge/license-Apache2.0/MIT-blue.svg
 [downloads-image]: https://img.shields.io/crates/d/frodo-kem-rs.svg
+[msrv-image]: https://img.shields.io/badge/rustc-1.82+-blue.svg
