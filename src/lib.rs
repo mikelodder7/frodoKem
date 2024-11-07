@@ -30,7 +30,8 @@
 //! let (ek, dk) = alg.generate_keypair(OsRng);
 //! // Top secret don't disclose
 //! let aes_256_key = [3u8; 32];
-//! let (ct, enc_ss) = alg.encapsulate(&ek, &aes_256_key, OsRng).unwrap();
+//! let salt = [7u8; 64];
+//! let (ct, enc_ss) = alg.encapsulate(&ek, &aes_256_key, &salt).unwrap();
 //! let (dec_ss, dec_msg) = alg.decapsulate(&dk, &ct).unwrap();
 //!
 //! assert_eq!(enc_ss, dec_ss);
@@ -319,12 +320,12 @@ impl EncryptionKey {
     /// NOTE: The message must be of the correct length for the algorithm.
     /// Also, this method is deterministic, meaning that using the same message
     /// will yield the same [`SharedSecret`] and [`Ciphertext`]
-    pub fn encapsulate<B: AsRef<[u8]>>(
+    pub fn encapsulate<B: AsRef<[u8]>, S: AsRef<[u8]>>(
         &self,
         message: B,
-        rng: impl CryptoRngCore,
+        salt: S,
     ) -> FrodoResult<(Ciphertext, SharedSecret)> {
-        self.algorithm.encapsulate(self, message, rng)
+        self.algorithm.encapsulate(self, message, salt)
     }
 }
 
@@ -609,6 +610,36 @@ impl std::str::FromStr for Algorithm {
                 set.insert(
                     FrodoKem1344Shake::default().algorithm(),
                     Algorithm::FrodoKem1344Shake,
+                );
+                #[cfg(feature = "efrodo640aes")]
+                set.insert(
+                    EphemeralFrodoKem640Aes::default().algorithm(),
+                    Algorithm::EphemeralFrodoKem640Aes,
+                );
+                #[cfg(feature = "efrodo976aes")]
+                set.insert(
+                    EphemeralFrodoKem976Aes::default().algorithm(),
+                    Algorithm::EphemeralFrodoKem976Aes,
+                );
+                #[cfg(feature = "efrodo1344aes")]
+                set.insert(
+                    EphemeralFrodoKem1344Aes::default().algorithm(),
+                    Algorithm::EphemeralFrodoKem1344Aes,
+                );
+                #[cfg(feature = "efrodo640shake")]
+                set.insert(
+                    EphemeralFrodoKem640Shake::default().algorithm(),
+                    Algorithm::EphemeralFrodoKem640Shake,
+                );
+                #[cfg(feature = "efrodo976shake")]
+                set.insert(
+                    EphemeralFrodoKem976Shake::default().algorithm(),
+                    Algorithm::EphemeralFrodoKem976Shake,
+                );
+                #[cfg(feature = "efrodo1344shake")]
+                set.insert(
+                    EphemeralFrodoKem1344Shake::default().algorithm(),
+                    Algorithm::EphemeralFrodoKem1344Shake,
                 );
 
                 set
@@ -908,6 +939,37 @@ impl Algorithm {
 
     const fn inner_message_length<P: Params>(&self) -> usize {
         P::BYTES_MU
+    }
+
+    /// Get the length of the salt
+    #[cfg(any(
+        feature = "frodo640aes",
+        feature = "frodo976aes",
+        feature = "frodo1344aes",
+        feature = "frodo640shake",
+        feature = "frodo976shake",
+        feature = "frodo1344shake"
+    ))]
+    pub const fn salt_length(&self) -> usize {
+        match self {
+            #[cfg(feature = "frodo640aes")]
+            Self::FrodoKem640Aes => self.inner_salt_length::<FrodoKem640Aes>(),
+            #[cfg(feature = "frodo976aes")]
+            Self::FrodoKem976Aes => self.inner_salt_length::<FrodoKem976Aes>(),
+            #[cfg(feature = "frodo1344aes")]
+            Self::FrodoKem1344Aes => self.inner_salt_length::<FrodoKem1344Aes>(),
+            #[cfg(feature = "frodo640shake")]
+            Self::FrodoKem640Shake => self.inner_salt_length::<FrodoKem640Shake>(),
+            #[cfg(feature = "frodo976shake")]
+            Self::FrodoKem976Shake => self.inner_salt_length::<FrodoKem976Shake>(),
+            #[cfg(feature = "frodo1344shake")]
+            Self::FrodoKem1344Shake => self.inner_salt_length::<FrodoKem1344Shake>(),
+            _ => 0,
+        }
+    }
+
+    const fn inner_salt_length<B: Params>(&self) -> usize {
+        B::BYTES_SALT
     }
 
     /// Get the length of the public key
@@ -1527,57 +1589,58 @@ impl Algorithm {
     /// NOTE: The message must be of the correct length for the algorithm.
     /// Also, this method is deterministic, meaning that using the same message
     /// will yield the same [`SharedSecret`] and [`Ciphertext`]
-    pub fn encapsulate<B: AsRef<[u8]>>(
+    pub fn encapsulate<B: AsRef<[u8]>, S: AsRef<[u8]>>(
         &self,
         public_key: &EncryptionKey,
         msg: B,
-        rng: impl CryptoRngCore,
+        salt: S,
     ) -> FrodoResult<(Ciphertext, SharedSecret)> {
         let msg = msg.as_ref();
+        let salt = salt.as_ref();
         match self {
             #[cfg(feature = "frodo640aes")]
-            Self::FrodoKem640Aes => self.inner_encapsulate::<FrodoKem640Aes>(public_key, msg, rng),
+            Self::FrodoKem640Aes => self.inner_encapsulate::<FrodoKem640Aes>(public_key, msg, salt),
             #[cfg(feature = "frodo976aes")]
-            Self::FrodoKem976Aes => self.inner_encapsulate::<FrodoKem976Aes>(public_key, msg, rng),
+            Self::FrodoKem976Aes => self.inner_encapsulate::<FrodoKem976Aes>(public_key, msg, salt),
             #[cfg(feature = "frodo1344aes")]
             Self::FrodoKem1344Aes => {
-                self.inner_encapsulate::<FrodoKem1344Aes>(public_key, msg, rng)
+                self.inner_encapsulate::<FrodoKem1344Aes>(public_key, msg, salt)
             }
             #[cfg(feature = "frodo640shake")]
             Self::FrodoKem640Shake => {
-                self.inner_encapsulate::<FrodoKem640Shake>(public_key, msg, rng)
+                self.inner_encapsulate::<FrodoKem640Shake>(public_key, msg, salt)
             }
             #[cfg(feature = "frodo976shake")]
             Self::FrodoKem976Shake => {
-                self.inner_encapsulate::<FrodoKem976Shake>(public_key, msg, rng)
+                self.inner_encapsulate::<FrodoKem976Shake>(public_key, msg, salt)
             }
             #[cfg(feature = "frodo1344shake")]
             Self::FrodoKem1344Shake => {
-                self.inner_encapsulate::<FrodoKem1344Shake>(public_key, msg, rng)
+                self.inner_encapsulate::<FrodoKem1344Shake>(public_key, msg, salt)
             }
             #[cfg(feature = "efrodo640aes")]
             Self::EphemeralFrodoKem640Aes => {
-                self.inner_encapsulate::<EphemeralFrodoKem640Aes>(public_key, msg, rng)
+                self.inner_encapsulate::<EphemeralFrodoKem640Aes>(public_key, msg, salt)
             }
             #[cfg(feature = "efrodo976aes")]
             Self::EphemeralFrodoKem976Aes => {
-                self.inner_encapsulate::<EphemeralFrodoKem976Aes>(public_key, msg, rng)
+                self.inner_encapsulate::<EphemeralFrodoKem976Aes>(public_key, msg, salt)
             }
             #[cfg(feature = "efrodo1344aes")]
             Self::EphemeralFrodoKem1344Aes => {
-                self.inner_encapsulate::<EphemeralFrodoKem1344Aes>(public_key, msg, rng)
+                self.inner_encapsulate::<EphemeralFrodoKem1344Aes>(public_key, msg, salt)
             }
             #[cfg(feature = "efrodo640shake")]
             Self::EphemeralFrodoKem640Shake => {
-                self.inner_encapsulate::<EphemeralFrodoKem640Shake>(public_key, msg, rng)
+                self.inner_encapsulate::<EphemeralFrodoKem640Shake>(public_key, msg, salt)
             }
             #[cfg(feature = "efrodo976shake")]
             Self::EphemeralFrodoKem976Shake => {
-                self.inner_encapsulate::<EphemeralFrodoKem976Shake>(public_key, msg, rng)
+                self.inner_encapsulate::<EphemeralFrodoKem976Shake>(public_key, msg, salt)
             }
             #[cfg(feature = "efrodo1344shake")]
             Self::EphemeralFrodoKem1344Shake => {
-                self.inner_encapsulate::<EphemeralFrodoKem1344Shake>(public_key, msg, rng)
+                self.inner_encapsulate::<EphemeralFrodoKem1344Shake>(public_key, msg, salt)
             }
         }
     }
@@ -1586,13 +1649,13 @@ impl Algorithm {
         &self,
         encryption_key: &EncryptionKey,
         msg: &[u8],
-        rng: impl CryptoRngCore,
+        salt: &[u8],
     ) -> FrodoResult<(Ciphertext, SharedSecret)> {
         if K::BYTES_MU != msg.len() {
             return Err(Error::InvalidMessageLength(msg.len()));
         }
         let pk = EncryptionKeyRef::from_slice(encryption_key.value.as_slice())?;
-        let (ct, ss) = K::default().encapsulate(pk, msg, rng);
+        let (ct, ss) = K::default().encapsulate(pk, msg, salt);
         Ok((
             Ciphertext {
                 algorithm: *self,
@@ -1805,7 +1868,7 @@ mod tests {
 
         let mut mu = vec![0u8; alg.message_length()];
         rng.fill_bytes(&mut mu);
-        let (our_ct, our_ess) = alg.encapsulate(&our_pk, &mu, &mut rng).unwrap();
+        let (our_ct, our_ess) = alg.encapsulate(&our_pk, &mu, &[]).unwrap();
         let (our_dss, mu_prime) = alg.decapsulate(&our_sk, &our_ct).unwrap();
         assert_eq!(our_ess.value, our_dss.value);
         assert_eq!(mu, mu_prime);
@@ -1835,7 +1898,9 @@ mod tests {
 
         let mut mu = vec![0u8; alg.message_length()];
         rng.fill_bytes(&mut mu);
-        let (our_ct, our_ess) = alg.encapsulate(&our_pk, &mu, &mut rng).unwrap();
+        let mut salt = vec![0u8; alg.salt_length()];
+        rng.fill_bytes(&mut salt);
+        let (our_ct, our_ess) = alg.encapsulate(&our_pk, &mu, &salt).unwrap();
         let (our_dss, mu_prime) = alg.decapsulate(&our_sk, &our_ct).unwrap();
         assert_eq!(our_ess.value, our_dss.value);
         assert_eq!(mu, mu_prime);

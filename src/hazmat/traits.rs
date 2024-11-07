@@ -192,9 +192,9 @@ pub trait Kem: Params + Expanded + Sample {
         public_key: P,
         mut rng: impl CryptoRngCore,
     ) -> (Ciphertext<Self>, SharedSecret<Self>) {
-        let mut mu = vec![0u8; Self::BYTES_MU];
+        let mut mu = vec![0u8; Self::BYTES_MU + Self::BYTES_SALT];
         rng.fill_bytes(&mut mu);
-        let res = self.encapsulate(public_key, &mu, rng);
+        let res = self.encapsulate(public_key, &mu[..Self::BYTES_MU], &mu[Self::BYTES_MU..]);
         mu.zeroize();
         res
     }
@@ -208,9 +208,10 @@ pub trait Kem: Params + Expanded + Sample {
         &self,
         public_key: P,
         mu: &[u8],
-        mut rng: impl CryptoRngCore,
+        salt: &[u8],
     ) -> (Ciphertext<Self>, SharedSecret<Self>) {
         assert_eq!(mu.len(), Self::BYTES_MU);
+        assert_eq!(salt.len(), Self::BYTES_SALT);
         let public_key = public_key.into();
         let mut ct = Ciphertext::default();
         let mut ss = SharedSecret::default();
@@ -221,7 +222,7 @@ pub trait Kem: Params + Expanded + Sample {
         shake.update(public_key.0);
         shake.finalize_xof_reset_into(&mut g2_in[..Self::BYTES_PK_HASH]);
         g2_in[Self::BYTES_PK_HASH..Self::BYTES_PK_HASH + Self::BYTES_MU].copy_from_slice(mu);
-        rng.fill_bytes(&mut g2_in[Self::BYTES_PK_HASH + Self::BYTES_MU..]);
+        g2_in[Self::BYTES_PK_HASH + Self::BYTES_MU..].copy_from_slice(salt);
         let mut g2_out = vec![0u8; Self::SHARED_SECRET_LENGTH + Self::BYTES_SEED_SE];
         shake.update(&g2_in);
         shake.finalize_xof_reset_into(&mut g2_out);
