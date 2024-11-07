@@ -50,7 +50,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly
       - run: cargo install cargo-careful
-      - run: cargo careful test
+      - run: cargo careful test tests
+      - run: cargo careful test test_vector --release
         
   clippy:
     runs-on: ubuntu-latest
