@@ -562,6 +562,7 @@ impl<P: Params, E: Expanded, S: Sample> Kem for FrodoKem<P, E, S> {
     feature = "efrodo976shake",
     feature = "efrodo1344shake",
 ))]
+/// The eFrodoKEM scheme
 #[derive(Copy, Clone, Default, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct EphemeralFrodoKem<P: Params, E: Expanded, S: Sample>(pub PhantomData<(P, E, S)>);
