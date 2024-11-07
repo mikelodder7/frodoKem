@@ -1917,6 +1917,12 @@ mod tests {
             #[case::shake640(Algorithm::FrodoKem640Shake)]
             #[case::shake976(Algorithm::FrodoKem976Shake)]
             #[case::shake1344(Algorithm::FrodoKem1344Shake)]
+            #[case::aes640(Algorithm::EphemeralFrodoKem640Aes)]
+            #[case::aes976(Algorithm::EphemeralFrodoKem976Aes)]
+            #[case::aes1344(Algorithm::EphemeralFrodoKem1344Aes)]
+            #[case::shake640(Algorithm::EphemeralFrodoKem640Shake)]
+            #[case::shake976(Algorithm::EphemeralFrodoKem976Shake)]
+            #[case::shake1344(Algorithm::EphemeralFrodoKem1344Shake)]
             fn $name(#[case] alg: Algorithm) {
                 let mut rng = rand_chacha::ChaCha8Rng::from_seed([3u8; 32]);
                 let (pk, sk) = alg.generate_keypair(&mut rng);
