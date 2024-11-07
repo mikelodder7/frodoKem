@@ -824,6 +824,17 @@ impl Params for EphemeralFrodo1344 {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct FrodoAes<P: Params>(pub(crate) PhantomData<P>);
 
+#[cfg(all(
+    not(feature = "openssl"),
+    any(
+        feature = "efrodo640aes",
+        feature = "frodo640aes",
+        feature = "efrodo976aes",
+        feature = "frodo976aes",
+        feature = "efrodo1344aes",
+        feature = "frodo1344aes",
+    )
+))]
 impl<P: Params> Expanded for FrodoAes<P> {
     const METHOD: &'static str = "AES";
 
@@ -884,6 +895,79 @@ impl<P: Params> Expanded for FrodoAes<P> {
     }
 }
 
+#[cfg(all(
+    feature = "openssl",
+    any(
+        feature = "efrodo640aes",
+        feature = "frodo640aes",
+        feature = "efrodo976aes",
+        feature = "frodo976aes",
+        feature = "efrodo1344aes",
+        feature = "frodo1344aes",
+    )
+))]
+impl<P: Params> Expanded for FrodoAes<P> {
+    const METHOD: &'static str = "AES";
+
+    fn expand_a(&self, seed_a: &[u8], a: &mut [u16]) {
+        debug_assert_eq!(a.len(), P::N_X_N);
+        debug_assert_eq!(seed_a.len(), P::BYTES_SEED_A);
+        debug_assert_eq!(seed_a.len(), 16);
+
+        let mut in_blocks = Vec::with_capacity(P::N_X_N * 16 / P::STRIPE_STEP);
+        let mut in_block = [0u8; 16];
+        for i in 0..P::N {
+            let ii = i as u16;
+            in_block[..2].copy_from_slice(&ii.to_le_bytes());
+            for j in (0..P::N).step_by(P::STRIPE_STEP) {
+                let jj = j as u16;
+                in_block[2..4].copy_from_slice(&jj.to_le_bytes());
+                in_blocks.extend_from_slice(&in_block);
+            }
+        }
+        unsafe {
+            let aes_key_schedule = openssl_sys::EVP_CIPHER_CTX_new();
+            if aes_key_schedule.is_null() {
+                assert!(false, "EVP_CIPHER_CTX_new failed");
+            }
+            if openssl_sys::EVP_EncryptInit_ex(
+                aes_key_schedule,
+                openssl_sys::EVP_aes_128_ecb(),
+                std::ptr::null_mut(),
+                seed_a.as_ptr(),
+                std::ptr::null_mut(),
+            ) != 1
+            {
+                assert!(false, "EVP_EncryptInit_ex failed");
+            }
+            let mut olen = in_blocks.len() as i32;
+            let ilen = in_blocks.len() as i32;
+            if openssl_sys::EVP_EncryptUpdate(
+                aes_key_schedule,
+                in_blocks.as_mut_ptr(),
+                &mut olen,
+                in_blocks.as_ptr(),
+                ilen,
+            ) != 1
+            {
+                assert!(false, "EVP_EncryptInit_ex failed");
+            }
+        }
+        let mut pos = 0;
+        for i in 0..P::N {
+            let row = i * P::N;
+            for j in (0..P::N).step_by(P::STRIPE_STEP) {
+                let block = &in_blocks[pos..pos + 16];
+                for k in 0..P::STRIPE_STEP {
+                    a[row + j + k] =
+                        u16::from_le_bytes([block[2 * k], block[2 * k + 1]]) & P::Q_MASK;
+                }
+                pos += 16;
+            }
+        }
+    }
+}
+
 #[cfg(any(
     feature = "efrodo640shake",
     feature = "frodo640shake",
@@ -899,13 +983,16 @@ impl<P: Params> Expanded for FrodoAes<P> {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct FrodoShake<P: Params>(pub PhantomData<P>);
 
-#[cfg(any(
-    feature = "efrodo640shake",
-    feature = "frodo640shake",
-    feature = "efrodo976shake",
-    feature = "frodo976shake",
-    feature = "efrodo1344shake",
-    feature = "frodo1344shake",
+#[cfg(all(
+    not(feature = "openssl"),
+    any(
+        feature = "efrodo640shake",
+        feature = "frodo640shake",
+        feature = "efrodo976shake",
+        feature = "frodo976shake",
+        feature = "efrodo1344shake",
+        feature = "frodo1344shake",
+    )
 ))]
 impl<P: Params> Expanded for FrodoShake<P> {
     const METHOD: &'static str = "SHAKE";
@@ -930,6 +1017,65 @@ impl<P: Params> Expanded for FrodoShake<P> {
             seed_separated[0..2].copy_from_slice(&(i as u16).to_le_bytes());
             shake.update(&seed_separated);
             shake.finalize_xof_reset_into(&mut a_row);
+
+            for j in 0..P::N {
+                a[ii + j] = u16::from_le_bytes([a_row[j * 2], a_row[j * 2 + 1]]);
+            }
+        }
+    }
+}
+
+#[cfg(all(
+    feature = "openssl",
+    any(
+        feature = "efrodo640shake",
+        feature = "frodo640shake",
+        feature = "efrodo976shake",
+        feature = "frodo976shake",
+        feature = "efrodo1344shake",
+        feature = "frodo1344shake",
+    )
+))]
+impl<P: Params> Expanded for FrodoShake<P> {
+    const METHOD: &'static str = "SHAKE";
+    fn expand_a(&self, seed_a: &[u8], a: &mut [u16]) {
+        debug_assert_eq!(a.len(), P::N_X_N);
+        debug_assert_eq!(seed_a.len(), P::BYTES_SEED_A);
+
+        let mut a_row = vec![0u8; P::TWO_N];
+        let mut seed_separated = vec![0u8; P::TWO_PLUS_BYTES_SEED_A];
+
+        seed_separated[2..].copy_from_slice(seed_a);
+
+        for i in 0..P::N {
+            let ii = i * P::N;
+
+            seed_separated[0..2].copy_from_slice(&(i as u16).to_le_bytes());
+            unsafe {
+                let shake = openssl_sys::EVP_MD_CTX_new();
+                if shake.is_null() {
+                    assert!(false, "EVP_MD_CTX_new failed");
+                }
+                if openssl_sys::EVP_DigestInit_ex(
+                    shake,
+                    openssl_sys::EVP_shake128(),
+                    std::ptr::null_mut(),
+                ) != 1
+                {
+                    assert!(false, "EVP_DigestInit_ex failed");
+                }
+                if openssl_sys::EVP_DigestUpdate(
+                    shake,
+                    seed_separated.as_ptr() as *const _,
+                    seed_separated.len(),
+                ) != 1
+                {
+                    assert!(false, "EVP_DigestUpdate failed");
+                }
+                if openssl_sys::EVP_DigestFinalXOF(shake, a_row.as_mut_ptr(), a_row.len()) != 1 {
+                    assert!(false, "EVP_DigestFinalXOF failed");
+                }
+            }
 
             for j in 0..P::N {
                 a[ii + j] = u16::from_le_bytes([a_row[j * 2], a_row[j * 2 + 1]]);

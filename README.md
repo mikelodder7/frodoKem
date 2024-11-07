@@ -53,9 +53,27 @@ is considered a security risk.
 
 When in doubt use the FrodoKEM algorithm variants.
 
-## Future work
+## Expanding matrix A
 
-- Speed up AES implementation.
+### NOTE on AES
+
+To speed up AES, there are a few options available:
+
+- `RUSTFLAGS="--cfg aes_armv8" cargo build --release` ensures that the ARMv8 AES instructions are used if available.
+- `frodo-kem-rs = { version = "0.3", features = ["openssl"] }` uses the `openssl` crate for AES.
+
+By default, the `aes` feature auto-detects the best AES implementation for your platform
+for x86 and x86_64,
+but not on ARMv8 where it defaults to the software implementation as of this writing.
+
+Enabling openssl and aesni provides the fastest Aes algorithms.  
+
+openssl tends to be faster than the aes rust crate implementation by about 10-15% on Armv8.
+
+### NOTE on SHAKE
+Shake auto detects the best implementation for your platform or like AES you can enable `openssl` for it also.
+
+On Armv8, the rust shake implementation is faster than the openssl implementation by about 22-25%.
 
 ## License
 
