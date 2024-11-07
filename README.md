@@ -65,6 +65,7 @@ To speed up AES, there are a few options available:
 By default, the `aes` feature auto-detects the best AES implementation for your platform
 for x86 and x86_64,
 but not on ARMv8 where it defaults to the software implementation as of this writing.
+To enable the ARMv8 AES instructions, the `aes_armv8` feature is enabled in the `.cargo/config` file in this crate.
 
 Enabling openssl and aesni provides the fastest Aes algorithms.  
 
