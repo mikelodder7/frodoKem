@@ -102,12 +102,7 @@ pub mod hazmat;
 #[cfg(not(feature = "hazmat"))]
 mod hazmat;
 
-use hazmat::{
-    CiphertextRef, DecryptionKeyRef, EncryptionKeyRef, EphemeralFrodoKem1344Aes,
-    EphemeralFrodoKem1344Shake, EphemeralFrodoKem640Aes, EphemeralFrodoKem640Shake,
-    EphemeralFrodoKem976Aes, EphemeralFrodoKem976Shake, FrodoKem1344Aes, FrodoKem1344Shake,
-    FrodoKem640Aes, FrodoKem640Shake, FrodoKem976Aes, FrodoKem976Shake, Kem, Params,
-};
+use hazmat::*;
 
 use rand_core::CryptoRngCore;
 use std::marker::PhantomData;
@@ -956,14 +951,6 @@ impl Algorithm {
     }
 
     /// Get the length of the salt
-    #[cfg(any(
-        feature = "frodo640aes",
-        feature = "frodo976aes",
-        feature = "frodo1344aes",
-        feature = "frodo640shake",
-        feature = "frodo976shake",
-        feature = "frodo1344shake"
-    ))]
     pub const fn salt_length(&self) -> usize {
         match self {
             #[cfg(feature = "frodo640aes")]
@@ -978,7 +965,24 @@ impl Algorithm {
             Self::FrodoKem976Shake => self.inner_salt_length::<FrodoKem976Shake>(),
             #[cfg(feature = "frodo1344shake")]
             Self::FrodoKem1344Shake => self.inner_salt_length::<FrodoKem1344Shake>(),
-            _ => 0,
+            #[cfg(feature = "efrodo640aes")]
+            Self::EphemeralFrodoKem640Aes => self.inner_salt_length::<EphemeralFrodoKem640Aes>(),
+            #[cfg(feature = "efrodo976aes")]
+            Self::EphemeralFrodoKem976Aes => self.inner_salt_length::<EphemeralFrodoKem976Aes>(),
+            #[cfg(feature = "efrodo1344aes")]
+            Self::EphemeralFrodoKem1344Aes => self.inner_salt_length::<EphemeralFrodoKem1344Aes>(),
+            #[cfg(feature = "efrodo640shake")]
+            Self::EphemeralFrodoKem640Shake => {
+                self.inner_salt_length::<EphemeralFrodoKem640Shake>()
+            }
+            #[cfg(feature = "efrodo976shake")]
+            Self::EphemeralFrodoKem976Shake => {
+                self.inner_salt_length::<EphemeralFrodoKem976Shake>()
+            }
+            #[cfg(feature = "efrodo1344shake")]
+            Self::EphemeralFrodoKem1344Shake => {
+                self.inner_salt_length::<EphemeralFrodoKem1344Shake>()
+            }
         }
     }
 

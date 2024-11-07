@@ -62,33 +62,51 @@ pub type FrodoKem1344Shake = FrodoKem<Frodo1344, FrodoShake<Frodo1344>, FrodoCdf
 
 #[cfg(feature = "efrodo640aes")]
 /// The eFrodoKEM-640-AES algorithm
-pub type EphemeralFrodoKem640Aes =
-    EphemeralFrodoKem<EphemeralFrodo640, FrodoAes<Frodo640>, FrodoCdfSample<Frodo640>>;
+pub type EphemeralFrodoKem640Aes = EphemeralFrodoKem<
+    EphemeralFrodo640,
+    FrodoAes<EphemeralFrodo640>,
+    FrodoCdfSample<EphemeralFrodo640>,
+>;
 
 #[cfg(feature = "efrodo976aes")]
 /// The eFrodoKEM-976-AES algorithm
-pub type EphemeralFrodoKem976Aes =
-    EphemeralFrodoKem<EphemeralFrodo976, FrodoAes<Frodo976>, FrodoCdfSample<Frodo976>>;
+pub type EphemeralFrodoKem976Aes = EphemeralFrodoKem<
+    EphemeralFrodo976,
+    FrodoAes<EphemeralFrodo976>,
+    FrodoCdfSample<EphemeralFrodo976>,
+>;
 
 #[cfg(feature = "efrodo1344aes")]
 /// The eFrodoKEM-1344-AES algorithm
-pub type EphemeralFrodoKem1344Aes =
-    EphemeralFrodoKem<EphemeralFrodo1344, FrodoAes<Frodo1344>, FrodoCdfSample<Frodo1344>>;
+pub type EphemeralFrodoKem1344Aes = EphemeralFrodoKem<
+    EphemeralFrodo1344,
+    FrodoAes<EphemeralFrodo1344>,
+    FrodoCdfSample<EphemeralFrodo1344>,
+>;
 
 #[cfg(feature = "efrodo640shake")]
 /// The eFrodoKEM-640-SHAKE algorithm
-pub type EphemeralFrodoKem640Shake =
-    EphemeralFrodoKem<EphemeralFrodo640, FrodoShake<Frodo640>, FrodoCdfSample<Frodo640>>;
+pub type EphemeralFrodoKem640Shake = EphemeralFrodoKem<
+    EphemeralFrodo640,
+    FrodoShake<EphemeralFrodo640>,
+    FrodoCdfSample<EphemeralFrodo640>,
+>;
 
 #[cfg(feature = "efrodo976shake")]
 /// The eFrodoKEM-976-SHAKE algorithm
-pub type EphemeralFrodoKem976Shake =
-    EphemeralFrodoKem<EphemeralFrodo976, FrodoShake<Frodo976>, FrodoCdfSample<Frodo976>>;
+pub type EphemeralFrodoKem976Shake = EphemeralFrodoKem<
+    EphemeralFrodo976,
+    FrodoShake<EphemeralFrodo976>,
+    FrodoCdfSample<EphemeralFrodo976>,
+>;
 
 #[cfg(feature = "efrodo1344shake")]
 /// The eFrodoKEM-1344-SHAKE algorithm
-pub type EphemeralFrodoKem1344Shake =
-    EphemeralFrodoKem<EphemeralFrodo1344, FrodoShake<Frodo1344>, FrodoCdfSample<Frodo1344>>;
+pub type EphemeralFrodoKem1344Shake = EphemeralFrodoKem<
+    EphemeralFrodo1344,
+    FrodoShake<EphemeralFrodo1344>,
+    FrodoCdfSample<EphemeralFrodo1344>,
+>;
 
 #[cfg(test)]
 mod tests {
