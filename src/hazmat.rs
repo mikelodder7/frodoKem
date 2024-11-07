@@ -320,4 +320,12 @@ mod tests {
         let (my_ss, _) = kem.decapsulate(&our_sk, &my_ciphertext);
         assert_eq!(my_ss.as_ref(), their_ss.as_ref());
     }
+
+    #[test]
+    fn aes_test() {
+        decapsulate_compatibility(
+            EphemeralFrodoKem640Aes::default(),
+            safe_oqs::kem::Algorithm::FrodoKem640Aes,
+        );
+    }
 }

@@ -836,23 +836,48 @@ impl<P: Params> Expanded for FrodoAes<P> {
         debug_assert_eq!(a.len(), P::N_X_N);
         debug_assert_eq!(seed_a.len(), P::BYTES_SEED_A);
         debug_assert_eq!(seed_a.len(), <Aes128Enc as KeySizeUser>::key_size());
-
         let enc = Aes128Enc::new_from_slice(seed_a).expect("a valid key size of 16 bytes");
 
-        let mut in_block = Block::default();
-        let mut out_block = Block::default();
+        // Original Reference Code is much slower
+        // let mut in_block = Block::default();
+        // let mut out_block = Block::default();
+        // for i in 0..P::N {
+        //     let ii = i as u16;
+        //     in_block[..2].copy_from_slice(&ii.to_le_bytes());
+        //     let row = i * P::N;
+        //     for j in (0..P::N).step_by(P::STRIPE_STEP) {
+        //         let jj = j as u16;
+        //         in_block[2..4].copy_from_slice(&jj.to_le_bytes());
+        //         enc.encrypt_block_b2b(&in_block, &mut out_block);
+        //
+        //         for k in 0..P::STRIPE_STEP {
+        //             a[row + j + k] =
+        //                 u16::from_le_bytes([out_block[2 * k], out_block[2 * k + 1]]) & P::Q_MASK;
+        //         }
+        //     }
+        // }
+
+        let mut blocks = Vec::with_capacity(P::N_X_N / P::STRIPE_STEP);
+
         for i in 0..P::N {
             let ii = i as u16;
-            in_block[..2].copy_from_slice(&ii.to_le_bytes());
-            let row = i * P::N;
+            let mut block = Block::default();
+            block[..2].copy_from_slice(&ii.to_le_bytes());
             for j in (0..P::N).step_by(P::STRIPE_STEP) {
                 let jj = j as u16;
-                in_block[2..4].copy_from_slice(&jj.to_le_bytes());
-                enc.encrypt_block_b2b(&in_block, &mut out_block);
-
+                block[2..4].copy_from_slice(&jj.to_le_bytes());
+                blocks.push(block);
+            }
+        }
+        enc.encrypt_blocks(&mut blocks);
+        let mut block_iter = blocks.into_iter();
+        for i in 0..P::N {
+            let row = i * P::N;
+            for j in (0..P::N).step_by(P::STRIPE_STEP) {
+                let block = block_iter.next().expect("another block");
                 for k in 0..P::STRIPE_STEP {
                     a[row + j + k] =
-                        u16::from_le_bytes([out_block[2 * k], out_block[2 * k + 1]]) & P::Q_MASK;
+                        u16::from_le_bytes([block[2 * k], block[2 * k + 1]]) & P::Q_MASK;
                 }
             }
         }
