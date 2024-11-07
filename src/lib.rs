@@ -4,9 +4,9 @@
 */
 //! ## Usage
 //!
-//! The standard safe method to use FrodoKEM is to use the [`Algorithm`]
-//! enum to select the desired algorithm, `encapsulate` a randomly generated
-//! value, and `decapsulate` it on the other side.
+//! The standard safe method for FrodoKEM is to use [`Algorithm`],
+//! `encapsulate` a randomly generated value,
+//! and `decapsulate` it on the other side.
 //!
 //! ```
 //! use frodo_kem_rs::Algorithm;
@@ -19,9 +19,10 @@
 //!
 //! assert_eq!(enc_ss, dec_ss);
 //! ```
-//! If the `message` to be encapsulated is known, it can be passed to the encapsulate method.
+//! If the `message` is known, it can be passed to the `encapsulate`.
 //! `encapsulate` will error if the `message` is not the correct size. This method also requires
-//! a `salt` for non-ephemeral algorithms.
+//! a `salt` for non-ephemeral algorithms, and the `salt` is considered public information.
+//!
 //! Ephemeral variants are meant to be used one-time only and thus do not require a `salt`.
 //!
 //! ## ☢️️ WARNING: HAZARDOUS ☢️
@@ -30,17 +31,18 @@
 //!
 //! ```
 //! use frodo_kem_rs::Algorithm;
-//! use rand_core::OsRng;
+//! use rand_core::{RngCore, OsRng};
 //!
 //! let alg = Algorithm::FrodoKem1344Shake;
 //! let (ek, dk) = alg.generate_keypair(OsRng);
-//! // Top secret don't disclose
-//! let aes_256_key = [3u8; 32];
-//! let salt = [7u8; 64];
+//! // Key is known, generate
+//! let aes_256_key = vec![3u8; alg.message_length()];
+//! let mut salt = vec![0u8; alg.salt_length()];
+//! OsRng.fill_bytes(&mut salt);
 //! let (ct, enc_ss) = alg.encapsulate(&ek, &aes_256_key, &salt).unwrap();
 //! let (dec_ss, dec_msg) = alg.decapsulate(&dk, &ct).unwrap();
 //!
-//! // Ephemeral method
+//! // Ephemeral method, no salt required
 //! let alg = Algorithm::EphemeralFrodoKem1344Shake;
 //! let (ct, enc_ss) = alg.encapsulate(&ek, &aes_256_key, &[]).unwrap();
 //! let (dec_ss, dec_msg) = alg.decapsulate(&dk, &ct).unwrap();
@@ -56,9 +58,9 @@
 //!
 //! ## Custom
 //!
-//! To create a custom implementation of FrodoKEM, use the `hazmat` feature, to enable
-//! the necessary traits for creating a custom implementation. Be warned, this is not
-//! recommended unless you are sure of what you are doing.
+//! To create a custom implementation of FrodoKEM, use the `hazmat` feature, to access
+//! the necessary traits and models for creating a custom implementation.
+//! Be warned, this is not recommended unless you are sure of what you are doing.
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
 #![warn(
     clippy::mod_module_files,

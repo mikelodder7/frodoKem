@@ -12,13 +12,13 @@ A pure rust implementation of
 - [ISO Standard](https://frodokem.org/files/FrodoKEM-standard_proposal-20230314.pdf)
 - [ISO Standard Annex](https://frodokem.org/files/FrodoKEM-annex-20230418.pdf)
 
-It's submission was included in NIST's PQ Round 3 competition.
+It's submission was included in NIST's PQ Round 3 competition, and is now being standardized at ISO.
 
 ## ⚠️ Security Warning
 
 This crate has been tested against the test vectors provided by the FrodoKEM team
 and been rigorously tested for correctness, performance, and security. It has 
-also been tested against opensafequatum's liboqs library to compatibility and correctness.
+also been tested against opensafequatum's [liboqs](https://github.com/open-quantum-safe/liboqs) library to compatibility and correctness.
 
 The implementation contained in this crate has never been independently audited!
 
@@ -74,6 +74,18 @@ openssl tends to be faster than the aes rust crate implementation by about 10-15
 Shake auto detects the best implementation for your platform or like AES you can enable `openssl` for it also.
 
 On Armv8, the rust shake implementation is faster than the openssl implementation by about 22-25%.
+
+## Serialization
+
+This crate has been tested against the following `serde` compatible formats:
+
+- [x] serde_bare
+- [x] bincode
+- [x] postcard
+- [x] serde_cbor
+- [x] serde_json
+- [x] serde_yaml
+- [x] toml
 
 ## License
 

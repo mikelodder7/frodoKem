@@ -32,7 +32,10 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: stable
-      - run: cargo build
+      - run: cargo build --no-default-features --features=frodo
+      - run: cargo build --no-default-features --features=efrodo
+      - run: cargo build --no-default-features || [ $? -eq 101 ]
+      - run: cargo build --all-features
 
 
   test:
@@ -43,6 +46,7 @@ jobs:
         with:
           toolchain: stable
       - run: cargo test --all-features --release
+      - run: cargo test --no-default-features --features=frodo,efrodo,serde --release
 
   careful:
     runs-on: ubuntu-latest
