@@ -5,13 +5,19 @@ on:
     paths-ignore: 
       - README.md
       - SECURITY.md
-      - LICENSE
+      - LICENSE-APACHE
+      - LICENSE-MIT
+      - .pants-ignore
+      - rustfmt.toml
   push:
     branches: main
     paths-ignore:
       - README.md
       - SECURITY.md
-      - LICENSE
+      - LICENSE-APACHE
+      - LICENSE-MIT
+      - .pants-ignore
+      - rustfmt.toml
 
 env:
   CARGO_INCREMENTAL: 0
