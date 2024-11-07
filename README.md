@@ -6,7 +6,10 @@
 [![Downloads][downloads-image]][crate-link]
 ![build](https://github.com/mikelodder7/frodoKem/actions/workflows/frodo-kem/badge.svg)
 
-A pure rust implementation of [FrodoKEM Learning with Errors Key Encapsulation](https://frodokem.org/files/FrodoKEM-specification-20210604.pdf).
+A pure rust implementation of 
+- [FrodoKEM Learning with Errors Key Encapsulation](https://frodokem.org/files/FrodoKEM-specification-20210604.pdf).
+- [ISO Standard](https://frodokem.org/files/FrodoKEM-standard_proposal-20230314.pdf)
+- [ISO Standard Annex](https://frodokem.org/files/FrodoKEM-annex-20230418.pdf)
 
 It's submission was included in NIST's PQ Round 3 competition.
 
@@ -30,10 +33,10 @@ This code implements
 - FrodoKEM-640 with AES and SHAKE.
 - FrodoKEM-976 with AES and SHAKE.
 - FrodoKEM-1344 with AES and SHAKE.
+- The ephemeral counter-parts
 
 ## Future work
 
-- **Experimental** FrodoKEM ZKP of Well-Encryptedness.
 - Speed up AES implementation.
 
 ## License
