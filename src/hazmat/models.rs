@@ -825,7 +825,7 @@ impl Params for EphemeralFrodo1344 {
 pub struct FrodoAes<P: Params>(pub(crate) PhantomData<P>);
 
 #[cfg(all(
-    not(feature = "openssl"),
+    not(feature = "openssl-aes"),
     any(
         feature = "efrodo640aes",
         feature = "frodo640aes",
@@ -896,7 +896,7 @@ impl<P: Params> Expanded for FrodoAes<P> {
 }
 
 #[cfg(all(
-    feature = "openssl",
+    feature = "openssl-aes",
     any(
         feature = "efrodo640aes",
         feature = "frodo640aes",
@@ -928,7 +928,7 @@ impl<P: Params> Expanded for FrodoAes<P> {
         unsafe {
             let aes_key_schedule = openssl_sys::EVP_CIPHER_CTX_new();
             if aes_key_schedule.is_null() {
-                assert!(false, "EVP_CIPHER_CTX_new failed");
+                panic!("EVP_CIPHER_CTX_new failed");
             }
             if openssl_sys::EVP_EncryptInit_ex(
                 aes_key_schedule,
@@ -938,7 +938,7 @@ impl<P: Params> Expanded for FrodoAes<P> {
                 std::ptr::null_mut(),
             ) != 1
             {
-                assert!(false, "EVP_EncryptInit_ex failed");
+                panic!("EVP_EncryptInit_ex failed");
             }
             let mut olen = in_blocks.len() as i32;
             let ilen = in_blocks.len() as i32;
@@ -950,7 +950,7 @@ impl<P: Params> Expanded for FrodoAes<P> {
                 ilen,
             ) != 1
             {
-                assert!(false, "EVP_EncryptInit_ex failed");
+                panic!("EVP_EncryptInit_ex failed");
             }
         }
         let mut pos = 0;
@@ -984,7 +984,7 @@ impl<P: Params> Expanded for FrodoAes<P> {
 pub struct FrodoShake<P: Params>(pub PhantomData<P>);
 
 #[cfg(all(
-    not(feature = "openssl"),
+    not(feature = "openssl-shake"),
     any(
         feature = "efrodo640shake",
         feature = "frodo640shake",
@@ -1026,7 +1026,7 @@ impl<P: Params> Expanded for FrodoShake<P> {
 }
 
 #[cfg(all(
-    feature = "openssl",
+    feature = "openssl-shake",
     any(
         feature = "efrodo640shake",
         feature = "frodo640shake",
@@ -1054,7 +1054,7 @@ impl<P: Params> Expanded for FrodoShake<P> {
             unsafe {
                 let shake = openssl_sys::EVP_MD_CTX_new();
                 if shake.is_null() {
-                    assert!(false, "EVP_MD_CTX_new failed");
+                    panic!("EVP_MD_CTX_new failed");
                 }
                 if openssl_sys::EVP_DigestInit_ex(
                     shake,
@@ -1062,7 +1062,7 @@ impl<P: Params> Expanded for FrodoShake<P> {
                     std::ptr::null_mut(),
                 ) != 1
                 {
-                    assert!(false, "EVP_DigestInit_ex failed");
+                    panic!("EVP_DigestInit_ex failed");
                 }
                 if openssl_sys::EVP_DigestUpdate(
                     shake,
@@ -1070,10 +1070,10 @@ impl<P: Params> Expanded for FrodoShake<P> {
                     seed_separated.len(),
                 ) != 1
                 {
-                    assert!(false, "EVP_DigestUpdate failed");
+                    panic!("EVP_DigestUpdate failed");
                 }
                 if openssl_sys::EVP_DigestFinalXOF(shake, a_row.as_mut_ptr(), a_row.len()) != 1 {
-                    assert!(false, "EVP_DigestFinalXOF failed");
+                    panic!("EVP_DigestFinalXOF failed");
                 }
             }
 

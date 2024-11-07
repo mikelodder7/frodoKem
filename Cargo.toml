@@ -36,24 +36,25 @@ frodo = [
     "frodo1344aes",
     "frodo1344shake",
 ]
-efrodo640aes = ["aes"]
-frodo640aes = ["aes"]
+efrodo640aes = ["dep:aes"]
+frodo640aes = ["dep:aes"]
 efrodo640shake = []
 frodo640shake = []
-efrodo976aes = ["aes"]
-frodo976aes = ["aes"]
+efrodo976aes = ["dep:aes"]
+frodo976aes = ["dep:aes"]
 efrodo976shake = []
 frodo976shake = []
-efrodo1344aes = ["aes"]
-frodo1344aes = ["aes"]
+efrodo1344aes = ["dep:aes"]
+frodo1344aes = ["dep:aes"]
 efrodo1344shake = []
 frodo1344shake = []
-openssl = ["dep:openssl-sys", "dep:digest"]
+openssl = ["openssl-aes", "openssl-shake"]
+openssl-aes = ["dep:openssl-sys"]
+openssl-shake = ["dep:openssl-sys"]
 serde = ["dep:hex", "dep:serde"]
 
 [dependencies]
 aes = { version = "0.8", optional = true }
-digest = { version = "0.10", optional = true }
 hex = { version = "0.4", optional = true }
 openssl-sys = { version = "0.9.104", optional = true }
 rand_core = { version = "0.6", features = ["std"] }
