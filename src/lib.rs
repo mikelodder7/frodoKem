@@ -870,17 +870,29 @@ impl Algorithm {
             #[cfg(feature = "frodo1344shake")]
             Self::FrodoKem1344Shake => self.inner_claimed_nist_level::<FrodoKem640Shake>(),
             #[cfg(feature = "efrodo640aes")]
-            Self::EphemeralFrodoKem640Aes => self.inner_claimed_nist_level::<EphemeralFrodoKem640Aes>(),
+            Self::EphemeralFrodoKem640Aes => {
+                self.inner_claimed_nist_level::<EphemeralFrodoKem640Aes>()
+            }
             #[cfg(feature = "efrodo976aes")]
-            Self::EphemeralFrodoKem976Aes => self.inner_claimed_nist_level::<EphemeralFrodoKem976Aes>(),
+            Self::EphemeralFrodoKem976Aes => {
+                self.inner_claimed_nist_level::<EphemeralFrodoKem976Aes>()
+            }
             #[cfg(feature = "efrodo1344aes")]
-            Self::EphemeralFrodoKem1344Aes => self.inner_claimed_nist_level::<EphemeralFrodoKem1344Aes>(),
+            Self::EphemeralFrodoKem1344Aes => {
+                self.inner_claimed_nist_level::<EphemeralFrodoKem1344Aes>()
+            }
             #[cfg(feature = "efrodo640shake")]
-            Self::EphemeralFrodoKem640Shake => self.inner_claimed_nist_level::<EphemeralFrodoKem640Shake>(),
+            Self::EphemeralFrodoKem640Shake => {
+                self.inner_claimed_nist_level::<EphemeralFrodoKem640Shake>()
+            }
             #[cfg(feature = "efrodo976shake")]
-            Self::EphemeralFrodoKem976Shake => self.inner_claimed_nist_level::<EphemeralFrodoKem976Shake>(),
+            Self::EphemeralFrodoKem976Shake => {
+                self.inner_claimed_nist_level::<EphemeralFrodoKem976Shake>()
+            }
             #[cfg(feature = "efrodo1344shake")]
-            Self::EphemeralFrodoKem1344Shake => self.inner_claimed_nist_level::<EphemeralFrodoKem1344Shake>(),
+            Self::EphemeralFrodoKem1344Shake => {
+                self.inner_claimed_nist_level::<EphemeralFrodoKem1344Shake>()
+            }
         }
     }
 
@@ -908,13 +920,21 @@ impl Algorithm {
             #[cfg(feature = "efrodo976aes")]
             Self::EphemeralFrodoKem976Aes => self.inner_message_length::<EphemeralFrodoKem976Aes>(),
             #[cfg(feature = "efrodo1344aes")]
-            Self::EphemeralFrodoKem1344Aes => self.inner_message_length::<EphemeralFrodoKem1344Aes>(),
+            Self::EphemeralFrodoKem1344Aes => {
+                self.inner_message_length::<EphemeralFrodoKem1344Aes>()
+            }
             #[cfg(feature = "efrodo640shake")]
-            Self::EphemeralFrodoKem640Shake => self.inner_message_length::<EphemeralFrodoKem640Shake>(),
+            Self::EphemeralFrodoKem640Shake => {
+                self.inner_message_length::<EphemeralFrodoKem640Shake>()
+            }
             #[cfg(feature = "efrodo976shake")]
-            Self::EphemeralFrodoKem976Shake => self.inner_message_length::<EphemeralFrodoKem976Shake>(),
+            Self::EphemeralFrodoKem976Shake => {
+                self.inner_message_length::<EphemeralFrodoKem976Shake>()
+            }
             #[cfg(feature = "efrodo1344shake")]
-            Self::EphemeralFrodoKem1344Shake => self.inner_message_length::<EphemeralFrodoKem1344Shake>(),
+            Self::EphemeralFrodoKem1344Shake => {
+                self.inner_message_length::<EphemeralFrodoKem1344Shake>()
+            }
         }
     }
 
@@ -969,17 +989,29 @@ impl Algorithm {
             #[cfg(feature = "frodo1344shake")]
             Self::FrodoKem1344Shake => self.inner_public_key_length::<FrodoKem1344Shake>(),
             #[cfg(feature = "efrodo640aes")]
-            Self::EphemeralFrodoKem640Aes => self.inner_public_key_length::<EphemeralFrodoKem640Aes>(),
+            Self::EphemeralFrodoKem640Aes => {
+                self.inner_public_key_length::<EphemeralFrodoKem640Aes>()
+            }
             #[cfg(feature = "efrodo976aes")]
-            Self::EphemeralFrodoKem976Aes => self.inner_public_key_length::<EphemeralFrodoKem976Aes>(),
+            Self::EphemeralFrodoKem976Aes => {
+                self.inner_public_key_length::<EphemeralFrodoKem976Aes>()
+            }
             #[cfg(feature = "efrodo1344aes")]
-            Self::EphemeralFrodoKem1344Aes => self.inner_public_key_length::<EphemeralFrodoKem1344Aes>(),
+            Self::EphemeralFrodoKem1344Aes => {
+                self.inner_public_key_length::<EphemeralFrodoKem1344Aes>()
+            }
             #[cfg(feature = "efrodo640shake")]
-            Self::EphemeralFrodoKem640Shake => self.inner_public_key_length::<EphemeralFrodoKem640Aes>(),
+            Self::EphemeralFrodoKem640Shake => {
+                self.inner_public_key_length::<EphemeralFrodoKem640Aes>()
+            }
             #[cfg(feature = "efrodo976shake")]
-            Self::EphemeralFrodoKem976Shake => self.inner_public_key_length::<EphemeralFrodoKem976Aes>(),
+            Self::EphemeralFrodoKem976Shake => {
+                self.inner_public_key_length::<EphemeralFrodoKem976Aes>()
+            }
             #[cfg(feature = "efrodo1344shake")]
-            Self::EphemeralFrodoKem1344Shake => self.inner_public_key_length::<EphemeralFrodoKem1344Aes>(),
+            Self::EphemeralFrodoKem1344Shake => {
+                self.inner_public_key_length::<EphemeralFrodoKem1344Aes>()
+            }
         }
     }
 
@@ -1003,17 +1035,29 @@ impl Algorithm {
             #[cfg(feature = "frodo1344shake")]
             Self::FrodoKem1344Shake => self.inner_decryption_key_length::<FrodoKem1344Shake>(),
             #[cfg(feature = "efrodo640aes")]
-            Self::EphemeralFrodoKem640Aes => self.inner_decryption_key_length::<EphemeralFrodoKem640Aes>(),
+            Self::EphemeralFrodoKem640Aes => {
+                self.inner_decryption_key_length::<EphemeralFrodoKem640Aes>()
+            }
             #[cfg(feature = "efrodo976aes")]
-            Self::EphemeralFrodoKem976Aes => self.inner_decryption_key_length::<EphemeralFrodoKem976Aes>(),
+            Self::EphemeralFrodoKem976Aes => {
+                self.inner_decryption_key_length::<EphemeralFrodoKem976Aes>()
+            }
             #[cfg(feature = "efrodo1344aes")]
-            Self::EphemeralFrodoKem1344Aes => self.inner_decryption_key_length::<EphemeralFrodoKem1344Aes>(),
+            Self::EphemeralFrodoKem1344Aes => {
+                self.inner_decryption_key_length::<EphemeralFrodoKem1344Aes>()
+            }
             #[cfg(feature = "efrodo640shake")]
-            Self::EphemeralFrodoKem640Shake => self.inner_decryption_key_length::<EphemeralFrodoKem640Aes>(),
+            Self::EphemeralFrodoKem640Shake => {
+                self.inner_decryption_key_length::<EphemeralFrodoKem640Aes>()
+            }
             #[cfg(feature = "efrodo976shake")]
-            Self::EphemeralFrodoKem976Shake => self.inner_decryption_key_length::<EphemeralFrodoKem976Aes>(),
+            Self::EphemeralFrodoKem976Shake => {
+                self.inner_decryption_key_length::<EphemeralFrodoKem976Aes>()
+            }
             #[cfg(feature = "efrodo1344shake")]
-            Self::EphemeralFrodoKem1344Shake => self.inner_decryption_key_length::<EphemeralFrodoKem1344Aes>(),
+            Self::EphemeralFrodoKem1344Shake => {
+                self.inner_decryption_key_length::<EphemeralFrodoKem1344Aes>()
+            }
         }
     }
 
@@ -1037,17 +1081,29 @@ impl Algorithm {
             #[cfg(feature = "frodo1344shake")]
             Self::FrodoKem1344Shake => self.inner_shared_secret_length::<FrodoKem1344Shake>(),
             #[cfg(feature = "efrodo640aes")]
-            Self::EphemeralFrodoKem640Aes => self.inner_shared_secret_length::<EphemeralFrodoKem640Aes>(),
+            Self::EphemeralFrodoKem640Aes => {
+                self.inner_shared_secret_length::<EphemeralFrodoKem640Aes>()
+            }
             #[cfg(feature = "efrodo976aes")]
-            Self::EphemeralFrodoKem976Aes => self.inner_shared_secret_length::<EphemeralFrodoKem976Aes>(),
+            Self::EphemeralFrodoKem976Aes => {
+                self.inner_shared_secret_length::<EphemeralFrodoKem976Aes>()
+            }
             #[cfg(feature = "efrodo1344aes")]
-            Self::EphemeralFrodoKem1344Aes => self.inner_shared_secret_length::<EphemeralFrodoKem1344Aes>(),
+            Self::EphemeralFrodoKem1344Aes => {
+                self.inner_shared_secret_length::<EphemeralFrodoKem1344Aes>()
+            }
             #[cfg(feature = "efrodo640shake")]
-            Self::EphemeralFrodoKem640Shake => self.inner_shared_secret_length::<EphemeralFrodoKem640Shake>(),
+            Self::EphemeralFrodoKem640Shake => {
+                self.inner_shared_secret_length::<EphemeralFrodoKem640Shake>()
+            }
             #[cfg(feature = "efrodo976shake")]
-            Self::EphemeralFrodoKem976Shake => self.inner_shared_secret_length::<EphemeralFrodoKem976Shake>(),
+            Self::EphemeralFrodoKem976Shake => {
+                self.inner_shared_secret_length::<EphemeralFrodoKem976Shake>()
+            }
             #[cfg(feature = "efrodo1344shake")]
-            Self::EphemeralFrodoKem1344Shake => self.inner_shared_secret_length::<EphemeralFrodoKem1344Shake>(),
+            Self::EphemeralFrodoKem1344Shake => {
+                self.inner_shared_secret_length::<EphemeralFrodoKem1344Shake>()
+            }
         }
     }
 
@@ -1071,17 +1127,29 @@ impl Algorithm {
             #[cfg(feature = "frodo1344shake")]
             Self::FrodoKem1344Shake => self.inner_ciphertext_length::<FrodoKem1344Shake>(),
             #[cfg(feature = "efrodo640aes")]
-            Self::EphemeralFrodoKem640Aes => self.inner_ciphertext_length::<EphemeralFrodoKem640Aes>(),
+            Self::EphemeralFrodoKem640Aes => {
+                self.inner_ciphertext_length::<EphemeralFrodoKem640Aes>()
+            }
             #[cfg(feature = "efrodo976aes")]
-            Self::EphemeralFrodoKem976Aes => self.inner_ciphertext_length::<EphemeralFrodoKem976Aes>(),
+            Self::EphemeralFrodoKem976Aes => {
+                self.inner_ciphertext_length::<EphemeralFrodoKem976Aes>()
+            }
             #[cfg(feature = "efrodo1344aes")]
-            Self::EphemeralFrodoKem1344Aes => self.inner_ciphertext_length::<EphemeralFrodoKem1344Aes>(),
+            Self::EphemeralFrodoKem1344Aes => {
+                self.inner_ciphertext_length::<EphemeralFrodoKem1344Aes>()
+            }
             #[cfg(feature = "efrodo640shake")]
-            Self::EphemeralFrodoKem640Shake => self.inner_ciphertext_length::<EphemeralFrodoKem640Shake>(),
+            Self::EphemeralFrodoKem640Shake => {
+                self.inner_ciphertext_length::<EphemeralFrodoKem640Shake>()
+            }
             #[cfg(feature = "efrodo976shake")]
-            Self::EphemeralFrodoKem976Shake => self.inner_ciphertext_length::<EphemeralFrodoKem976Shake>(),
+            Self::EphemeralFrodoKem976Shake => {
+                self.inner_ciphertext_length::<EphemeralFrodoKem976Shake>()
+            }
             #[cfg(feature = "efrodo1344shake")]
-            Self::EphemeralFrodoKem1344Shake => self.inner_ciphertext_length::<EphemeralFrodoKem1344Shake>(),
+            Self::EphemeralFrodoKem1344Shake => {
+                self.inner_ciphertext_length::<EphemeralFrodoKem1344Shake>()
+            }
         }
     }
 
@@ -1093,21 +1161,37 @@ impl Algorithm {
     pub fn encryption_key_from_decryption_key(&self, secret_key: &DecryptionKey) -> EncryptionKey {
         match self {
             #[cfg(feature = "frodo640aes")]
-            Self::FrodoKem640Aes => self.inner_encryption_key_from_decryption_key::<FrodoKem640Aes>(secret_key),
+            Self::FrodoKem640Aes => {
+                self.inner_encryption_key_from_decryption_key::<FrodoKem640Aes>(secret_key)
+            }
             #[cfg(feature = "frodo976aes")]
-            Self::FrodoKem976Aes => self.inner_encryption_key_from_decryption_key::<FrodoKem976Aes>(secret_key),
+            Self::FrodoKem976Aes => {
+                self.inner_encryption_key_from_decryption_key::<FrodoKem976Aes>(secret_key)
+            }
             #[cfg(feature = "frodo1344aes")]
-            Self::FrodoKem1344Aes => self.inner_encryption_key_from_decryption_key::<FrodoKem1344Aes>(secret_key),
+            Self::FrodoKem1344Aes => {
+                self.inner_encryption_key_from_decryption_key::<FrodoKem1344Aes>(secret_key)
+            }
             #[cfg(feature = "frodo640shake")]
-            Self::FrodoKem640Shake => self.inner_encryption_key_from_decryption_key::<FrodoKem640Shake>(secret_key),
+            Self::FrodoKem640Shake => {
+                self.inner_encryption_key_from_decryption_key::<FrodoKem640Shake>(secret_key)
+            }
             #[cfg(feature = "frodo976shake")]
-            Self::FrodoKem976Shake => self.inner_encryption_key_from_decryption_key::<FrodoKem976Shake>(secret_key),
+            Self::FrodoKem976Shake => {
+                self.inner_encryption_key_from_decryption_key::<FrodoKem976Shake>(secret_key)
+            }
             #[cfg(feature = "frodo1344shake")]
-            Self::FrodoKem1344Shake => self.inner_encryption_key_from_decryption_key::<FrodoKem1344Shake>(secret_key),
+            Self::FrodoKem1344Shake => {
+                self.inner_encryption_key_from_decryption_key::<FrodoKem1344Shake>(secret_key)
+            }
             #[cfg(feature = "efrodo640aes")]
-            Self::EphemeralFrodoKem640Aes => self.inner_encryption_key_from_decryption_key::<EphemeralFrodoKem640Aes>(secret_key),
+            Self::EphemeralFrodoKem640Aes => {
+                self.inner_encryption_key_from_decryption_key::<EphemeralFrodoKem640Aes>(secret_key)
+            }
             #[cfg(feature = "efrodo976aes")]
-            Self::EphemeralFrodoKem976Aes => self.inner_encryption_key_from_decryption_key::<EphemeralFrodoKem976Aes>(secret_key),
+            Self::EphemeralFrodoKem976Aes => {
+                self.inner_encryption_key_from_decryption_key::<EphemeralFrodoKem976Aes>(secret_key)
+            }
             #[cfg(feature = "efrodo1344aes")]
             Self::EphemeralFrodoKem1344Aes => self
                 .inner_encryption_key_from_decryption_key::<EphemeralFrodoKem1344Aes>(secret_key),
@@ -1151,19 +1235,33 @@ impl Algorithm {
             #[cfg(feature = "frodo976shake")]
             Self::FrodoKem976Shake => self.inner_decryption_key_from_bytes::<FrodoKem976Shake>(buf),
             #[cfg(feature = "frodo1344shake")]
-            Self::FrodoKem1344Shake => self.inner_decryption_key_from_bytes::<FrodoKem1344Shake>(buf),
+            Self::FrodoKem1344Shake => {
+                self.inner_decryption_key_from_bytes::<FrodoKem1344Shake>(buf)
+            }
             #[cfg(feature = "efrodo640aes")]
-            Self::EphemeralFrodoKem640Aes => self.inner_decryption_key_from_bytes::<EphemeralFrodoKem640Aes>(buf),
+            Self::EphemeralFrodoKem640Aes => {
+                self.inner_decryption_key_from_bytes::<EphemeralFrodoKem640Aes>(buf)
+            }
             #[cfg(feature = "efrodo976aes")]
-            Self::EphemeralFrodoKem976Aes => self.inner_decryption_key_from_bytes::<EphemeralFrodoKem976Aes>(buf),
+            Self::EphemeralFrodoKem976Aes => {
+                self.inner_decryption_key_from_bytes::<EphemeralFrodoKem976Aes>(buf)
+            }
             #[cfg(feature = "efrodo1344aes")]
-            Self::EphemeralFrodoKem1344Aes => self.inner_decryption_key_from_bytes::<EphemeralFrodoKem1344Aes>(buf),
+            Self::EphemeralFrodoKem1344Aes => {
+                self.inner_decryption_key_from_bytes::<EphemeralFrodoKem1344Aes>(buf)
+            }
             #[cfg(feature = "efrodo640shake")]
-            Self::EphemeralFrodoKem640Shake => self.inner_decryption_key_from_bytes::<EphemeralFrodoKem640Shake>(buf),
+            Self::EphemeralFrodoKem640Shake => {
+                self.inner_decryption_key_from_bytes::<EphemeralFrodoKem640Shake>(buf)
+            }
             #[cfg(feature = "efrodo976shake")]
-            Self::EphemeralFrodoKem976Shake => self.inner_decryption_key_from_bytes::<EphemeralFrodoKem976Shake>(buf),
+            Self::EphemeralFrodoKem976Shake => {
+                self.inner_decryption_key_from_bytes::<EphemeralFrodoKem976Shake>(buf)
+            }
             #[cfg(feature = "efrodo1344shake")]
-            Self::EphemeralFrodoKem1344Shake => self.inner_decryption_key_from_bytes::<EphemeralFrodoKem1344Shake>(buf),
+            Self::EphemeralFrodoKem1344Shake => {
+                self.inner_decryption_key_from_bytes::<EphemeralFrodoKem1344Shake>(buf)
+            }
         }
     }
 
@@ -1191,19 +1289,33 @@ impl Algorithm {
             #[cfg(feature = "frodo976shake")]
             Self::FrodoKem976Shake => self.inner_encryption_key_from_bytes::<FrodoKem976Shake>(buf),
             #[cfg(feature = "frodo1344shake")]
-            Self::FrodoKem1344Shake => self.inner_encryption_key_from_bytes::<FrodoKem1344Shake>(buf),
+            Self::FrodoKem1344Shake => {
+                self.inner_encryption_key_from_bytes::<FrodoKem1344Shake>(buf)
+            }
             #[cfg(feature = "efrodo640aes")]
-            Self::EphemeralFrodoKem640Aes => self.inner_encryption_key_from_bytes::<EphemeralFrodoKem640Aes>(buf),
+            Self::EphemeralFrodoKem640Aes => {
+                self.inner_encryption_key_from_bytes::<EphemeralFrodoKem640Aes>(buf)
+            }
             #[cfg(feature = "efrodo976aes")]
-            Self::EphemeralFrodoKem976Aes => self.inner_encryption_key_from_bytes::<EphemeralFrodoKem976Aes>(buf),
+            Self::EphemeralFrodoKem976Aes => {
+                self.inner_encryption_key_from_bytes::<EphemeralFrodoKem976Aes>(buf)
+            }
             #[cfg(feature = "efrodo1344aes")]
-            Self::EphemeralFrodoKem1344Aes => self.inner_encryption_key_from_bytes::<EphemeralFrodoKem1344Aes>(buf),
+            Self::EphemeralFrodoKem1344Aes => {
+                self.inner_encryption_key_from_bytes::<EphemeralFrodoKem1344Aes>(buf)
+            }
             #[cfg(feature = "efrodo640shake")]
-            Self::EphemeralFrodoKem640Shake => self.inner_encryption_key_from_bytes::<EphemeralFrodoKem640Shake>(buf),
+            Self::EphemeralFrodoKem640Shake => {
+                self.inner_encryption_key_from_bytes::<EphemeralFrodoKem640Shake>(buf)
+            }
             #[cfg(feature = "efrodo976shake")]
-            Self::EphemeralFrodoKem976Shake => self.inner_encryption_key_from_bytes::<EphemeralFrodoKem976Shake>(buf),
+            Self::EphemeralFrodoKem976Shake => {
+                self.inner_encryption_key_from_bytes::<EphemeralFrodoKem976Shake>(buf)
+            }
             #[cfg(feature = "efrodo1344shake")]
-            Self::EphemeralFrodoKem1344Shake => self.inner_encryption_key_from_bytes::<EphemeralFrodoKem1344Shake>(buf),
+            Self::EphemeralFrodoKem1344Shake => {
+                self.inner_encryption_key_from_bytes::<EphemeralFrodoKem1344Shake>(buf)
+            }
         }
     }
 
@@ -1220,30 +1332,40 @@ impl Algorithm {
     pub fn ciphertext_from_bytes(&self, buf: &[u8]) -> FrodoResult<Ciphertext> {
         match self {
             #[cfg(feature = "frodo640aes")]
-            Self::FrodoKem640Aes => hazmat::Ciphertext::<FrodoKem640Aes>::from_slice(buf).map(|s| Ciphertext {
+            Self::FrodoKem640Aes => {
+                hazmat::Ciphertext::<FrodoKem640Aes>::from_slice(buf).map(|s| Ciphertext {
                     algorithm: *self,
                     value: s.0,
-                }),
+                })
+            }
             #[cfg(feature = "frodo976aes")]
-            Self::FrodoKem976Aes => hazmat::Ciphertext::<FrodoKem976Aes>::from_slice(buf).map(|s| Ciphertext {
+            Self::FrodoKem976Aes => {
+                hazmat::Ciphertext::<FrodoKem976Aes>::from_slice(buf).map(|s| Ciphertext {
                     algorithm: *self,
                     value: s.0,
-                }),
+                })
+            }
             #[cfg(feature = "frodo1344aes")]
-            Self::FrodoKem1344Aes => hazmat::Ciphertext::<FrodoKem1344Aes>::from_slice(buf).map(|s| Ciphertext {
+            Self::FrodoKem1344Aes => {
+                hazmat::Ciphertext::<FrodoKem1344Aes>::from_slice(buf).map(|s| Ciphertext {
                     algorithm: *self,
                     value: s.0,
-                }),
+                })
+            }
             #[cfg(feature = "frodo640shake")]
-            Self::FrodoKem640Shake => hazmat::Ciphertext::<FrodoKem640Shake>::from_slice(buf).map(|s| Ciphertext {
+            Self::FrodoKem640Shake => {
+                hazmat::Ciphertext::<FrodoKem640Shake>::from_slice(buf).map(|s| Ciphertext {
                     algorithm: *self,
                     value: s.0,
-                }),
+                })
+            }
             #[cfg(feature = "frodo976shake")]
-            Self::FrodoKem976Shake => hazmat::Ciphertext::<FrodoKem976Shake>::from_slice(buf).map(|s| Ciphertext {
+            Self::FrodoKem976Shake => {
+                hazmat::Ciphertext::<FrodoKem976Shake>::from_slice(buf).map(|s| Ciphertext {
                     algorithm: *self,
                     value: s.0,
-                }),
+                })
+            }
             #[cfg(feature = "frodo1344shake")]
             Self::FrodoKem1344Shake => hazmat::Ciphertext::<FrodoKem1344Shake>::from_slice(buf)
                 .map(|s| Ciphertext {
@@ -1251,43 +1373,55 @@ impl Algorithm {
                     value: s.0,
                 }),
             #[cfg(feature = "efrodo640aes")]
-            Self::EphemeralFrodoKem640Aes => hazmat::Ciphertext::<EphemeralFrodoKem640Aes>::from_slice(buf).map(|s| Ciphertext {
+            Self::EphemeralFrodoKem640Aes => {
+                hazmat::Ciphertext::<EphemeralFrodoKem640Aes>::from_slice(buf).map(|s| Ciphertext {
                     algorithm: *self,
                     value: s.0,
-                }),
+                })
+            }
             #[cfg(feature = "efrodo976aes")]
-            Self::EphemeralFrodoKem976Aes => hazmat::Ciphertext::<EphemeralFrodoKem976Aes>::from_slice(buf).map(|s| Ciphertext {
+            Self::EphemeralFrodoKem976Aes => {
+                hazmat::Ciphertext::<EphemeralFrodoKem976Aes>::from_slice(buf).map(|s| Ciphertext {
                     algorithm: *self,
                     value: s.0,
-                }),
+                })
+            }
             #[cfg(feature = "efrodo1344aes")]
-            Self::EphemeralFrodoKem1344Aes => hazmat::Ciphertext::<EphemeralFrodoKem1344Aes>::from_slice(buf).map(|s| {
+            Self::EphemeralFrodoKem1344Aes => {
+                hazmat::Ciphertext::<EphemeralFrodoKem1344Aes>::from_slice(buf).map(|s| {
                     Ciphertext {
                         algorithm: *self,
                         value: s.0,
                     }
-                }),
+                })
+            }
             #[cfg(feature = "efrodo640shake")]
-            Self::EphemeralFrodoKem640Shake => hazmat::Ciphertext::<EphemeralFrodoKem640Shake>::from_slice(buf).map(|s| {
+            Self::EphemeralFrodoKem640Shake => {
+                hazmat::Ciphertext::<EphemeralFrodoKem640Shake>::from_slice(buf).map(|s| {
                     Ciphertext {
                         algorithm: *self,
                         value: s.0,
                     }
-                }),
+                })
+            }
             #[cfg(feature = "efrodo976shake")]
-            Self::EphemeralFrodoKem976Shake => hazmat::Ciphertext::<EphemeralFrodoKem976Shake>::from_slice(buf).map(|s| {
+            Self::EphemeralFrodoKem976Shake => {
+                hazmat::Ciphertext::<EphemeralFrodoKem976Shake>::from_slice(buf).map(|s| {
                     Ciphertext {
                         algorithm: *self,
                         value: s.0,
                     }
-                }),
+                })
+            }
             #[cfg(feature = "efrodo1344shake")]
-            Self::EphemeralFrodoKem1344Shake => hazmat::Ciphertext::<EphemeralFrodoKem1344Shake>::from_slice(buf).map(|s| {
+            Self::EphemeralFrodoKem1344Shake => {
+                hazmat::Ciphertext::<EphemeralFrodoKem1344Shake>::from_slice(buf).map(|s| {
                     Ciphertext {
                         algorithm: *self,
                         value: s.0,
                     }
-                }),
+                })
+            }
         }
     }
 
@@ -1297,20 +1431,26 @@ impl Algorithm {
     pub fn shared_secret_from_bytes(&self, buf: &[u8]) -> FrodoResult<SharedSecret> {
         match self {
             #[cfg(feature = "frodo640aes")]
-            Self::FrodoKem640Aes => hazmat::SharedSecret::<FrodoKem640Aes>::from_slice(buf).map(|s| SharedSecret {
+            Self::FrodoKem640Aes => {
+                hazmat::SharedSecret::<FrodoKem640Aes>::from_slice(buf).map(|s| SharedSecret {
                     algorithm: *self,
                     value: s.0,
-                }),
+                })
+            }
             #[cfg(feature = "frodo976aes")]
-            Self::FrodoKem976Aes => hazmat::SharedSecret::<FrodoKem976Aes>::from_slice(buf).map(|s| SharedSecret {
+            Self::FrodoKem976Aes => {
+                hazmat::SharedSecret::<FrodoKem976Aes>::from_slice(buf).map(|s| SharedSecret {
                     algorithm: *self,
                     value: s.0,
-                }),
+                })
+            }
             #[cfg(feature = "frodo1344aes")]
-            Self::FrodoKem1344Aes => hazmat::SharedSecret::<FrodoKem1344Aes>::from_slice(buf).map(|s| SharedSecret {
+            Self::FrodoKem1344Aes => {
+                hazmat::SharedSecret::<FrodoKem1344Aes>::from_slice(buf).map(|s| SharedSecret {
                     algorithm: *self,
                     value: s.0,
-                }),
+                })
+            }
             #[cfg(feature = "frodo640shake")]
             Self::FrodoKem640Shake => hazmat::SharedSecret::<FrodoKem640Shake>::from_slice(buf)
                 .map(|s| SharedSecret {
@@ -1464,25 +1604,45 @@ impl Algorithm {
             #[cfg(feature = "frodo976aes")]
             Self::FrodoKem976Aes => self.inner_encapsulate::<FrodoKem976Aes>(public_key, msg, salt),
             #[cfg(feature = "frodo1344aes")]
-            Self::FrodoKem1344Aes => self.inner_encapsulate::<FrodoKem1344Aes>(public_key, msg, salt),
+            Self::FrodoKem1344Aes => {
+                self.inner_encapsulate::<FrodoKem1344Aes>(public_key, msg, salt)
+            }
             #[cfg(feature = "frodo640shake")]
-            Self::FrodoKem640Shake => self.inner_encapsulate::<FrodoKem640Shake>(public_key, msg, salt),
+            Self::FrodoKem640Shake => {
+                self.inner_encapsulate::<FrodoKem640Shake>(public_key, msg, salt)
+            }
             #[cfg(feature = "frodo976shake")]
-            Self::FrodoKem976Shake => self.inner_encapsulate::<FrodoKem976Shake>(public_key, msg, salt),
+            Self::FrodoKem976Shake => {
+                self.inner_encapsulate::<FrodoKem976Shake>(public_key, msg, salt)
+            }
             #[cfg(feature = "frodo1344shake")]
-            Self::FrodoKem1344Shake => self.inner_encapsulate::<FrodoKem1344Shake>(public_key, msg, salt),
+            Self::FrodoKem1344Shake => {
+                self.inner_encapsulate::<FrodoKem1344Shake>(public_key, msg, salt)
+            }
             #[cfg(feature = "efrodo640aes")]
-            Self::EphemeralFrodoKem640Aes => self.inner_encapsulate::<EphemeralFrodoKem640Aes>(public_key, msg, salt),
+            Self::EphemeralFrodoKem640Aes => {
+                self.inner_encapsulate::<EphemeralFrodoKem640Aes>(public_key, msg, salt)
+            }
             #[cfg(feature = "efrodo976aes")]
-            Self::EphemeralFrodoKem976Aes => self.inner_encapsulate::<EphemeralFrodoKem976Aes>(public_key, msg, salt),
+            Self::EphemeralFrodoKem976Aes => {
+                self.inner_encapsulate::<EphemeralFrodoKem976Aes>(public_key, msg, salt)
+            }
             #[cfg(feature = "efrodo1344aes")]
-            Self::EphemeralFrodoKem1344Aes => self.inner_encapsulate::<EphemeralFrodoKem1344Aes>(public_key, msg, salt),
+            Self::EphemeralFrodoKem1344Aes => {
+                self.inner_encapsulate::<EphemeralFrodoKem1344Aes>(public_key, msg, salt)
+            }
             #[cfg(feature = "efrodo640shake")]
-            Self::EphemeralFrodoKem640Shake => self.inner_encapsulate::<EphemeralFrodoKem640Shake>(public_key, msg, salt),
+            Self::EphemeralFrodoKem640Shake => {
+                self.inner_encapsulate::<EphemeralFrodoKem640Shake>(public_key, msg, salt)
+            }
             #[cfg(feature = "efrodo976shake")]
-            Self::EphemeralFrodoKem976Shake => self.inner_encapsulate::<EphemeralFrodoKem976Shake>(public_key, msg, salt),
+            Self::EphemeralFrodoKem976Shake => {
+                self.inner_encapsulate::<EphemeralFrodoKem976Shake>(public_key, msg, salt)
+            }
             #[cfg(feature = "efrodo1344shake")]
-            Self::EphemeralFrodoKem1344Shake => self.inner_encapsulate::<EphemeralFrodoKem1344Shake>(public_key, msg, salt),
+            Self::EphemeralFrodoKem1344Shake => {
+                self.inner_encapsulate::<EphemeralFrodoKem1344Shake>(public_key, msg, salt)
+            }
         }
     }
 
@@ -1517,29 +1677,53 @@ impl Algorithm {
     ) -> FrodoResult<(Ciphertext, SharedSecret)> {
         match self {
             #[cfg(feature = "frodo640aes")]
-            Self::FrodoKem640Aes => self.inner_encapsulate_with_rng::<FrodoKem640Aes>(public_key, rng),
+            Self::FrodoKem640Aes => {
+                self.inner_encapsulate_with_rng::<FrodoKem640Aes>(public_key, rng)
+            }
             #[cfg(feature = "frodo976aes")]
-            Self::FrodoKem976Aes => self.inner_encapsulate_with_rng::<FrodoKem976Aes>(public_key, rng),
+            Self::FrodoKem976Aes => {
+                self.inner_encapsulate_with_rng::<FrodoKem976Aes>(public_key, rng)
+            }
             #[cfg(feature = "frodo1344aes")]
-            Self::FrodoKem1344Aes => self.inner_encapsulate_with_rng::<FrodoKem1344Aes>(public_key, rng),
+            Self::FrodoKem1344Aes => {
+                self.inner_encapsulate_with_rng::<FrodoKem1344Aes>(public_key, rng)
+            }
             #[cfg(feature = "frodo640shake")]
-            Self::FrodoKem640Shake => self.inner_encapsulate_with_rng::<FrodoKem640Shake>(public_key, rng),
+            Self::FrodoKem640Shake => {
+                self.inner_encapsulate_with_rng::<FrodoKem640Shake>(public_key, rng)
+            }
             #[cfg(feature = "frodo976shake")]
-            Self::FrodoKem976Shake => self.inner_encapsulate_with_rng::<FrodoKem976Shake>(public_key, rng),
+            Self::FrodoKem976Shake => {
+                self.inner_encapsulate_with_rng::<FrodoKem976Shake>(public_key, rng)
+            }
             #[cfg(feature = "frodo1344shake")]
-            Self::FrodoKem1344Shake => self.inner_encapsulate_with_rng::<FrodoKem1344Shake>(public_key, rng),
+            Self::FrodoKem1344Shake => {
+                self.inner_encapsulate_with_rng::<FrodoKem1344Shake>(public_key, rng)
+            }
             #[cfg(feature = "efrodo640aes")]
-            Self::EphemeralFrodoKem640Aes => self.inner_encapsulate_with_rng::<EphemeralFrodoKem640Aes>(public_key, rng),
+            Self::EphemeralFrodoKem640Aes => {
+                self.inner_encapsulate_with_rng::<EphemeralFrodoKem640Aes>(public_key, rng)
+            }
             #[cfg(feature = "efrodo976aes")]
-            Self::EphemeralFrodoKem976Aes => self.inner_encapsulate_with_rng::<EphemeralFrodoKem976Aes>(public_key, rng),
+            Self::EphemeralFrodoKem976Aes => {
+                self.inner_encapsulate_with_rng::<EphemeralFrodoKem976Aes>(public_key, rng)
+            }
             #[cfg(feature = "efrodo1344aes")]
-            Self::EphemeralFrodoKem1344Aes => self.inner_encapsulate_with_rng::<EphemeralFrodoKem1344Aes>(public_key, rng),
+            Self::EphemeralFrodoKem1344Aes => {
+                self.inner_encapsulate_with_rng::<EphemeralFrodoKem1344Aes>(public_key, rng)
+            }
             #[cfg(feature = "efrodo640shake")]
-            Self::EphemeralFrodoKem640Shake => self.inner_encapsulate_with_rng::<EphemeralFrodoKem640Shake>(public_key, rng),
+            Self::EphemeralFrodoKem640Shake => {
+                self.inner_encapsulate_with_rng::<EphemeralFrodoKem640Shake>(public_key, rng)
+            }
             #[cfg(feature = "efrodo976shake")]
-            Self::EphemeralFrodoKem976Shake => self.inner_encapsulate_with_rng::<EphemeralFrodoKem976Shake>(public_key, rng),
+            Self::EphemeralFrodoKem976Shake => {
+                self.inner_encapsulate_with_rng::<EphemeralFrodoKem976Shake>(public_key, rng)
+            }
             #[cfg(feature = "efrodo1344shake")]
-            Self::EphemeralFrodoKem1344Shake => self.inner_encapsulate_with_rng::<EphemeralFrodoKem1344Shake>(public_key, rng),
+            Self::EphemeralFrodoKem1344Shake => {
+                self.inner_encapsulate_with_rng::<EphemeralFrodoKem1344Shake>(public_key, rng)
+            }
         }
     }
 
@@ -1571,29 +1755,53 @@ impl Algorithm {
     ) -> FrodoResult<(SharedSecret, Vec<u8>)> {
         match self {
             #[cfg(feature = "frodo640aes")]
-            Self::FrodoKem640Aes => self.inner_decapsulate::<FrodoKem640Aes>(secret_key, ciphertext),
+            Self::FrodoKem640Aes => {
+                self.inner_decapsulate::<FrodoKem640Aes>(secret_key, ciphertext)
+            }
             #[cfg(feature = "frodo976aes")]
-            Self::FrodoKem976Aes => self.inner_decapsulate::<FrodoKem976Aes>(secret_key, ciphertext),
+            Self::FrodoKem976Aes => {
+                self.inner_decapsulate::<FrodoKem976Aes>(secret_key, ciphertext)
+            }
             #[cfg(feature = "frodo1344aes")]
-            Self::FrodoKem1344Aes => self.inner_decapsulate::<FrodoKem1344Aes>(secret_key, ciphertext),
+            Self::FrodoKem1344Aes => {
+                self.inner_decapsulate::<FrodoKem1344Aes>(secret_key, ciphertext)
+            }
             #[cfg(feature = "frodo640shake")]
-            Self::FrodoKem640Shake => self.inner_decapsulate::<FrodoKem640Shake>(secret_key, ciphertext),
+            Self::FrodoKem640Shake => {
+                self.inner_decapsulate::<FrodoKem640Shake>(secret_key, ciphertext)
+            }
             #[cfg(feature = "frodo976shake")]
-            Self::FrodoKem976Shake => self.inner_decapsulate::<FrodoKem976Shake>(secret_key, ciphertext),
+            Self::FrodoKem976Shake => {
+                self.inner_decapsulate::<FrodoKem976Shake>(secret_key, ciphertext)
+            }
             #[cfg(feature = "frodo1344shake")]
-            Self::FrodoKem1344Shake => self.inner_decapsulate::<FrodoKem1344Shake>(secret_key, ciphertext),
+            Self::FrodoKem1344Shake => {
+                self.inner_decapsulate::<FrodoKem1344Shake>(secret_key, ciphertext)
+            }
             #[cfg(feature = "efrodo640aes")]
-            Self::EphemeralFrodoKem640Aes => self.inner_decapsulate::<EphemeralFrodoKem640Aes>(secret_key, ciphertext),
+            Self::EphemeralFrodoKem640Aes => {
+                self.inner_decapsulate::<EphemeralFrodoKem640Aes>(secret_key, ciphertext)
+            }
             #[cfg(feature = "efrodo976aes")]
-            Self::EphemeralFrodoKem976Aes => self.inner_decapsulate::<EphemeralFrodoKem976Aes>(secret_key, ciphertext),
+            Self::EphemeralFrodoKem976Aes => {
+                self.inner_decapsulate::<EphemeralFrodoKem976Aes>(secret_key, ciphertext)
+            }
             #[cfg(feature = "efrodo1344aes")]
-            Self::EphemeralFrodoKem1344Aes => self.inner_decapsulate::<EphemeralFrodoKem1344Aes>(secret_key, ciphertext),
+            Self::EphemeralFrodoKem1344Aes => {
+                self.inner_decapsulate::<EphemeralFrodoKem1344Aes>(secret_key, ciphertext)
+            }
             #[cfg(feature = "efrodo640shake")]
-            Self::EphemeralFrodoKem640Shake => self.inner_decapsulate::<EphemeralFrodoKem640Shake>(secret_key, ciphertext),
+            Self::EphemeralFrodoKem640Shake => {
+                self.inner_decapsulate::<EphemeralFrodoKem640Shake>(secret_key, ciphertext)
+            }
             #[cfg(feature = "efrodo976shake")]
-            Self::EphemeralFrodoKem976Shake => self.inner_decapsulate::<EphemeralFrodoKem976Shake>(secret_key, ciphertext),
+            Self::EphemeralFrodoKem976Shake => {
+                self.inner_decapsulate::<EphemeralFrodoKem976Shake>(secret_key, ciphertext)
+            }
             #[cfg(feature = "efrodo1344shake")]
-            Self::EphemeralFrodoKem1344Shake => self.inner_decapsulate::<EphemeralFrodoKem1344Shake>(secret_key, ciphertext),
+            Self::EphemeralFrodoKem1344Shake => {
+                self.inner_decapsulate::<EphemeralFrodoKem1344Shake>(secret_key, ciphertext)
+            }
         }
     }
 
