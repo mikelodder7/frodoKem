@@ -503,14 +503,15 @@ pub struct FrodoKem<P: Params, E: Expanded, S: Sample>(pub PhantomData<(P, E, S)
 ))]
 impl<P: Params, E: Expanded, S: Sample> Params for FrodoKem<P, E, S> {
     type Shake = P::Shake;
-    const N: usize = P::N;
-    const LOG_Q: usize = P::LOG_Q;
-    const EXTRACTED_BITS: usize = P::EXTRACTED_BITS;
+
+    const BYTES_SALT: usize = P::BYTES_SALT;
+    const BYTES_SEED_SE: usize = P::BYTES_SEED_SE;
     const CDF_TABLE: &'static [u16] = P::CDF_TABLE;
     const CLAIMED_NIST_LEVEL: usize = P::CLAIMED_NIST_LEVEL;
+    const EXTRACTED_BITS: usize = P::EXTRACTED_BITS;
+    const LOG_Q: usize = P::LOG_Q;
+    const N: usize = P::N;
     const SHARED_SECRET_LENGTH: usize = P::SHARED_SECRET_LENGTH;
-    const BYTES_SEED_SE: usize = P::BYTES_SEED_SE;
-    const BYTES_SALT: usize = P::BYTES_SALT;
 }
 
 #[cfg(any(
@@ -523,6 +524,7 @@ impl<P: Params, E: Expanded, S: Sample> Params for FrodoKem<P, E, S> {
 ))]
 impl<P: Params, E: Expanded, S: Sample> Expanded for FrodoKem<P, E, S> {
     const METHOD: &'static str = E::METHOD;
+
     fn expand_a(&self, seed_a: &[u8], a: &mut [u16]) {
         E::expand_a(&E::default(), seed_a, a)
     }
@@ -577,14 +579,15 @@ pub struct EphemeralFrodoKem<P: Params, E: Expanded, S: Sample>(pub PhantomData<
 ))]
 impl<P: Params, E: Expanded, S: Sample> Params for EphemeralFrodoKem<P, E, S> {
     type Shake = P::Shake;
-    const N: usize = P::N;
-    const LOG_Q: usize = P::LOG_Q;
-    const EXTRACTED_BITS: usize = P::EXTRACTED_BITS;
+
+    const BYTES_SALT: usize = P::BYTES_SALT;
+    const BYTES_SEED_SE: usize = P::BYTES_SEED_SE;
     const CDF_TABLE: &'static [u16] = P::CDF_TABLE;
     const CLAIMED_NIST_LEVEL: usize = P::CLAIMED_NIST_LEVEL;
+    const EXTRACTED_BITS: usize = P::EXTRACTED_BITS;
+    const LOG_Q: usize = P::LOG_Q;
+    const N: usize = P::N;
     const SHARED_SECRET_LENGTH: usize = P::SHARED_SECRET_LENGTH;
-    const BYTES_SEED_SE: usize = P::BYTES_SEED_SE;
-    const BYTES_SALT: usize = P::BYTES_SALT;
 }
 
 #[cfg(any(
@@ -597,6 +600,7 @@ impl<P: Params, E: Expanded, S: Sample> Params for EphemeralFrodoKem<P, E, S> {
 ))]
 impl<P: Params, E: Expanded, S: Sample> Expanded for EphemeralFrodoKem<P, E, S> {
     const METHOD: &'static str = E::METHOD;
+
     fn expand_a(&self, seed_a: &[u8], a: &mut [u16]) {
         E::expand_a(&E::default(), seed_a, a)
     }
@@ -643,13 +647,13 @@ struct InnerFrodo640;
     feature = "frodo640shake",
 ))]
 impl InnerFrodo640 {
-    const N: usize = 640;
-    const LOG_Q: usize = 15;
-    const EXTRACTED_BITS: usize = 2;
     const CDF_TABLE: &'static [u16] = &[
         4643, 13363, 20579, 25843, 29227, 31145, 32103, 32525, 32689, 32745, 32762, 32766, 32767,
     ];
     const CLAIMED_NIST_LEVEL: usize = 1;
+    const EXTRACTED_BITS: usize = 2;
+    const LOG_Q: usize = 15;
+    const N: usize = 640;
     const SHARED_SECRET_LENGTH: usize = 16;
 }
 
@@ -662,11 +666,12 @@ pub struct Frodo640;
 #[cfg(any(feature = "frodo640aes", feature = "frodo640shake",))]
 impl Params for Frodo640 {
     type Shake = sha3::Shake128;
-    const N: usize = InnerFrodo640::N;
-    const LOG_Q: usize = InnerFrodo640::LOG_Q;
-    const EXTRACTED_BITS: usize = InnerFrodo640::EXTRACTED_BITS;
+
     const CDF_TABLE: &'static [u16] = InnerFrodo640::CDF_TABLE;
     const CLAIMED_NIST_LEVEL: usize = InnerFrodo640::CLAIMED_NIST_LEVEL;
+    const EXTRACTED_BITS: usize = InnerFrodo640::EXTRACTED_BITS;
+    const LOG_Q: usize = InnerFrodo640::LOG_Q;
+    const N: usize = InnerFrodo640::N;
     const SHARED_SECRET_LENGTH: usize = InnerFrodo640::SHARED_SECRET_LENGTH;
 }
 
@@ -679,14 +684,15 @@ pub struct EphemeralFrodo640;
 #[cfg(any(feature = "efrodo640aes", feature = "efrodo640shake",))]
 impl Params for EphemeralFrodo640 {
     type Shake = sha3::Shake128;
-    const N: usize = InnerFrodo640::N;
-    const LOG_Q: usize = InnerFrodo640::LOG_Q;
-    const EXTRACTED_BITS: usize = InnerFrodo640::EXTRACTED_BITS;
+
+    const BYTES_SALT: usize = 0;
+    const BYTES_SEED_SE: usize = Self::SHARED_SECRET_LENGTH;
     const CDF_TABLE: &'static [u16] = InnerFrodo640::CDF_TABLE;
     const CLAIMED_NIST_LEVEL: usize = InnerFrodo640::CLAIMED_NIST_LEVEL;
+    const EXTRACTED_BITS: usize = InnerFrodo640::EXTRACTED_BITS;
+    const LOG_Q: usize = InnerFrodo640::LOG_Q;
+    const N: usize = InnerFrodo640::N;
     const SHARED_SECRET_LENGTH: usize = InnerFrodo640::SHARED_SECRET_LENGTH;
-    const BYTES_SEED_SE: usize = Self::SHARED_SECRET_LENGTH;
-    const BYTES_SALT: usize = 0;
 }
 
 #[cfg(any(
@@ -704,13 +710,13 @@ struct InnerFrodo976;
     feature = "frodo976shake",
 ))]
 impl InnerFrodo976 {
-    const N: usize = 976;
-    const LOG_Q: usize = 16;
-    const EXTRACTED_BITS: usize = 3;
     const CDF_TABLE: &'static [u16] = &[
         5638, 15915, 23689, 28571, 31116, 32217, 32613, 32731, 32760, 32766, 32767,
     ];
     const CLAIMED_NIST_LEVEL: usize = 3;
+    const EXTRACTED_BITS: usize = 3;
+    const LOG_Q: usize = 16;
+    const N: usize = 976;
     const SHARED_SECRET_LENGTH: usize = 24;
 }
 
@@ -723,11 +729,12 @@ pub struct Frodo976;
 #[cfg(any(feature = "frodo976aes", feature = "frodo976shake",))]
 impl Params for Frodo976 {
     type Shake = sha3::Shake256;
-    const N: usize = InnerFrodo976::N;
-    const LOG_Q: usize = InnerFrodo976::LOG_Q;
-    const EXTRACTED_BITS: usize = InnerFrodo976::EXTRACTED_BITS;
+
     const CDF_TABLE: &'static [u16] = InnerFrodo976::CDF_TABLE;
     const CLAIMED_NIST_LEVEL: usize = InnerFrodo976::CLAIMED_NIST_LEVEL;
+    const EXTRACTED_BITS: usize = InnerFrodo976::EXTRACTED_BITS;
+    const LOG_Q: usize = InnerFrodo976::LOG_Q;
+    const N: usize = InnerFrodo976::N;
     const SHARED_SECRET_LENGTH: usize = InnerFrodo976::SHARED_SECRET_LENGTH;
 }
 
@@ -740,14 +747,15 @@ pub struct EphemeralFrodo976;
 #[cfg(any(feature = "efrodo976aes", feature = "efrodo976shake",))]
 impl Params for EphemeralFrodo976 {
     type Shake = sha3::Shake256;
-    const N: usize = InnerFrodo976::N;
-    const LOG_Q: usize = InnerFrodo976::LOG_Q;
-    const EXTRACTED_BITS: usize = InnerFrodo976::EXTRACTED_BITS;
+
+    const BYTES_SALT: usize = 0;
+    const BYTES_SEED_SE: usize = InnerFrodo976::SHARED_SECRET_LENGTH;
     const CDF_TABLE: &'static [u16] = InnerFrodo976::CDF_TABLE;
     const CLAIMED_NIST_LEVEL: usize = InnerFrodo976::CLAIMED_NIST_LEVEL;
+    const EXTRACTED_BITS: usize = InnerFrodo976::EXTRACTED_BITS;
+    const LOG_Q: usize = InnerFrodo976::LOG_Q;
+    const N: usize = InnerFrodo976::N;
     const SHARED_SECRET_LENGTH: usize = InnerFrodo976::SHARED_SECRET_LENGTH;
-    const BYTES_SEED_SE: usize = InnerFrodo976::SHARED_SECRET_LENGTH;
-    const BYTES_SALT: usize = 0;
 }
 
 #[cfg(any(
@@ -765,11 +773,11 @@ struct InnerFrodo1344;
     feature = "frodo1344shake",
 ))]
 impl InnerFrodo1344 {
-    const N: usize = 1344;
-    const LOG_Q: usize = 16;
-    const EXTRACTED_BITS: usize = 4;
     const CDF_TABLE: &'static [u16] = &[9142, 23462, 30338, 32361, 32725, 32765, 32767];
     const CLAIMED_NIST_LEVEL: usize = 5;
+    const EXTRACTED_BITS: usize = 4;
+    const LOG_Q: usize = 16;
+    const N: usize = 1344;
     const SHARED_SECRET_LENGTH: usize = 32;
 }
 
@@ -782,11 +790,12 @@ pub struct Frodo1344;
 #[cfg(any(feature = "frodo1344aes", feature = "frodo1344shake",))]
 impl Params for Frodo1344 {
     type Shake = sha3::Shake256;
-    const N: usize = InnerFrodo1344::N;
-    const LOG_Q: usize = InnerFrodo1344::LOG_Q;
-    const EXTRACTED_BITS: usize = InnerFrodo1344::EXTRACTED_BITS;
+
     const CDF_TABLE: &'static [u16] = InnerFrodo1344::CDF_TABLE;
     const CLAIMED_NIST_LEVEL: usize = InnerFrodo1344::CLAIMED_NIST_LEVEL;
+    const EXTRACTED_BITS: usize = InnerFrodo1344::EXTRACTED_BITS;
+    const LOG_Q: usize = InnerFrodo1344::LOG_Q;
+    const N: usize = InnerFrodo1344::N;
     const SHARED_SECRET_LENGTH: usize = InnerFrodo1344::SHARED_SECRET_LENGTH;
 }
 
@@ -799,14 +808,15 @@ pub struct EphemeralFrodo1344;
 #[cfg(any(feature = "efrodo1344aes", feature = "efrodo1344shake",))]
 impl Params for EphemeralFrodo1344 {
     type Shake = sha3::Shake256;
-    const N: usize = InnerFrodo1344::N;
-    const LOG_Q: usize = InnerFrodo1344::LOG_Q;
-    const EXTRACTED_BITS: usize = InnerFrodo1344::EXTRACTED_BITS;
+
+    const BYTES_SALT: usize = 0;
+    const BYTES_SEED_SE: usize = Self::SHARED_SECRET_LENGTH;
     const CDF_TABLE: &'static [u16] = InnerFrodo1344::CDF_TABLE;
     const CLAIMED_NIST_LEVEL: usize = InnerFrodo1344::CLAIMED_NIST_LEVEL;
+    const EXTRACTED_BITS: usize = InnerFrodo1344::EXTRACTED_BITS;
+    const LOG_Q: usize = InnerFrodo1344::LOG_Q;
+    const N: usize = InnerFrodo1344::N;
     const SHARED_SECRET_LENGTH: usize = InnerFrodo1344::SHARED_SECRET_LENGTH;
-    const BYTES_SEED_SE: usize = Self::SHARED_SECRET_LENGTH;
-    const BYTES_SALT: usize = 0;
 }
 
 #[cfg(any(
@@ -868,8 +878,11 @@ impl<P: Params> Expanded for FrodoAes<P> {
         //     }
         // }
 
-        let mut blocks = Vec::with_capacity(P::N_X_N / P::STRIPE_STEP);
-
+        // Treat `a` as blocks then overwrite in place to avoid allocation
+        let blocks = unsafe {
+            std::slice::from_raw_parts_mut(a.as_mut_ptr() as *mut Block, P::N_X_N / P::STRIPE_STEP)
+        };
+        let mut pos = 0;
         for i in 0..P::N {
             let ii = i as u16;
             let mut block = Block::default();
@@ -877,19 +890,16 @@ impl<P: Params> Expanded for FrodoAes<P> {
             for j in (0..P::N).step_by(P::STRIPE_STEP) {
                 let jj = j as u16;
                 block[2..4].copy_from_slice(&jj.to_le_bytes());
-                blocks.push(block);
+                blocks[pos] = block;
+                pos += 1;
             }
         }
-        enc.encrypt_blocks(&mut blocks);
-        let mut block_iter = blocks.into_iter();
-        for i in 0..P::N {
-            let row = i * P::N;
-            for j in (0..P::N).step_by(P::STRIPE_STEP) {
-                let block = block_iter.next().expect("another block");
-                for k in 0..P::STRIPE_STEP {
-                    a[row + j + k] =
-                        u16::from_le_bytes([block[2 * k], block[2 * k + 1]]) & P::Q_MASK;
-                }
+
+        enc.encrypt_blocks(blocks);
+        #[cfg(target_endian = "big")]
+        {
+            for i in a.iter_mut() {
+                *i = i.to_be();
             }
         }
     }
@@ -914,15 +924,18 @@ impl<P: Params> Expanded for FrodoAes<P> {
         debug_assert_eq!(seed_a.len(), P::BYTES_SEED_A);
         debug_assert_eq!(seed_a.len(), 16);
 
-        let mut in_blocks = Vec::with_capacity(P::N_X_N * 16 / P::STRIPE_STEP);
+        let in_blocks =
+            unsafe { std::slice::from_raw_parts_mut(a.as_mut_ptr() as *mut u8, P::N_X_N * 2) };
         let mut in_block = [0u8; 16];
+        let mut pos = 0;
         for i in 0..P::N {
             let ii = i as u16;
             in_block[..2].copy_from_slice(&ii.to_le_bytes());
             for j in (0..P::N).step_by(P::STRIPE_STEP) {
                 let jj = j as u16;
                 in_block[2..4].copy_from_slice(&jj.to_le_bytes());
-                in_blocks.extend_from_slice(&in_block);
+                in_blocks[pos..pos + 16].copy_from_slice(&in_block);
+                pos += 16;
             }
         }
         unsafe {
@@ -953,16 +966,10 @@ impl<P: Params> Expanded for FrodoAes<P> {
                 panic!("EVP_EncryptInit_ex failed");
             }
         }
-        let mut pos = 0;
-        for i in 0..P::N {
-            let row = i * P::N;
-            for j in (0..P::N).step_by(P::STRIPE_STEP) {
-                let block = &in_blocks[pos..pos + 16];
-                for k in 0..P::STRIPE_STEP {
-                    a[row + j + k] =
-                        u16::from_le_bytes([block[2 * k], block[2 * k + 1]]) & P::Q_MASK;
-                }
-                pos += 16;
+        #[cfg(target_endian = "big")]
+        {
+            for i in a.iter_mut() {
+                *i = i.to_be();
             }
         }
     }
@@ -996,6 +1003,7 @@ pub struct FrodoShake<P: Params>(pub PhantomData<P>);
 ))]
 impl<P: Params> Expanded for FrodoShake<P> {
     const METHOD: &'static str = "SHAKE";
+
     fn expand_a(&self, seed_a: &[u8], a: &mut [u16]) {
         use sha3::{
             digest::{ExtendableOutputReset, Update},
@@ -1005,7 +1013,6 @@ impl<P: Params> Expanded for FrodoShake<P> {
         debug_assert_eq!(a.len(), P::N_X_N);
         debug_assert_eq!(seed_a.len(), P::BYTES_SEED_A);
 
-        let mut a_row = vec![0u8; P::TWO_N];
         let mut seed_separated = vec![0u8; P::TWO_PLUS_BYTES_SEED_A];
         let mut shake = Shake128::default();
 
@@ -1016,10 +1023,16 @@ impl<P: Params> Expanded for FrodoShake<P> {
 
             seed_separated[0..2].copy_from_slice(&(i as u16).to_le_bytes());
             shake.update(&seed_separated);
-            shake.finalize_xof_reset_into(&mut a_row);
-
-            for j in 0..P::N {
-                a[ii + j] = u16::from_le_bytes([a_row[j * 2], a_row[j * 2 + 1]]);
+            let a_temp = &mut a[ii..ii + P::N];
+            let bytes = unsafe {
+                std::slice::from_raw_parts_mut(a_temp.as_mut_ptr() as *mut u8, a_temp.len() * 2)
+            };
+            shake.finalize_xof_reset_into(bytes);
+            #[cfg(target_endian = "big")]
+            {
+                for i in a_temp {
+                    *i = i.to_be();
+                }
             }
         }
     }
@@ -1038,11 +1051,12 @@ impl<P: Params> Expanded for FrodoShake<P> {
 ))]
 impl<P: Params> Expanded for FrodoShake<P> {
     const METHOD: &'static str = "SHAKE";
+
     fn expand_a(&self, seed_a: &[u8], a: &mut [u16]) {
         debug_assert_eq!(a.len(), P::N_X_N);
         debug_assert_eq!(seed_a.len(), P::BYTES_SEED_A);
 
-        let mut a_row = vec![0u8; P::TWO_N];
+        // let mut a_row = vec![0u8; P::TWO_N];
         let mut seed_separated = vec![0u8; P::TWO_PLUS_BYTES_SEED_A];
 
         seed_separated[2..].copy_from_slice(seed_a);
@@ -1072,13 +1086,20 @@ impl<P: Params> Expanded for FrodoShake<P> {
                 {
                     panic!("EVP_DigestUpdate failed");
                 }
-                if openssl_sys::EVP_DigestFinalXOF(shake, a_row.as_mut_ptr(), a_row.len()) != 1 {
+                if openssl_sys::EVP_DigestFinalXOF(
+                    shake,
+                    a[ii..ii + P::N].as_mut_ptr() as *mut u8,
+                    P::TWO_N,
+                ) != 1
+                {
                     panic!("EVP_DigestFinalXOF failed");
                 }
             }
-
-            for j in 0..P::N {
-                a[ii + j] = u16::from_le_bytes([a_row[j * 2], a_row[j * 2 + 1]]);
+        }
+        #[cfg(target_endian = "big")]
+        {
+            for i in a.iter_mut() {
+                *i = i.to_be();
             }
         }
     }

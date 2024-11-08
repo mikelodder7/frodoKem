@@ -448,14 +448,53 @@ pub trait Kem: Params + Expanded + Sample {
         debug_assert_eq!(e.len(), Self::N_X_N_BAR);
         debug_assert_eq!(out.len(), Self::N_BAR_X_N);
 
-        for i in 0..Self::N {
+        // Reference implementation
+        // for i in 0..Self::N {
+        //     for k in 0..Self::N_BAR {
+        //         let mut sum = e[k * Self::N + i];
+        //         let k_n = k * Self::N;
+        //         for j in 0..Self::N {
+        //             sum = sum.wrapping_add(a[j * Self::N + i].wrapping_mul(s[k_n + j]));
+        //         }
+        //         out[k_n + i] = out[k_n + i].wrapping_add(sum);
+        //     }
+        // }
+
+        // Unroll to process 8 columns at a time
+        for i in (0..Self::N).step_by(8) {
             for k in 0..Self::N_BAR {
-                let mut sum = e[k * Self::N + i];
                 let k_n = k * Self::N;
+                let mut sum = [
+                    e[k_n + i],
+                    e[k_n + i + 1],
+                    e[k_n + i + 2],
+                    e[k_n + i + 3],
+                    e[k_n + i + 4],
+                    e[k_n + i + 5],
+                    e[k_n + i + 6],
+                    e[k_n + i + 7],
+                ];
+
                 for j in 0..Self::N {
-                    sum = sum.wrapping_add(a[j * Self::N + i].wrapping_mul(s[k_n + j]));
+                    let sp = s[k_n + j];
+                    sum[0] = sum[0].wrapping_add(a[j * Self::N + i].wrapping_mul(sp));
+                    sum[1] = sum[1].wrapping_add(a[j * Self::N + i + 1].wrapping_mul(sp));
+                    sum[2] = sum[2].wrapping_add(a[j * Self::N + i + 2].wrapping_mul(sp));
+                    sum[3] = sum[3].wrapping_add(a[j * Self::N + i + 3].wrapping_mul(sp));
+                    sum[4] = sum[4].wrapping_add(a[j * Self::N + i + 4].wrapping_mul(sp));
+                    sum[5] = sum[5].wrapping_add(a[j * Self::N + i + 5].wrapping_mul(sp));
+                    sum[6] = sum[6].wrapping_add(a[j * Self::N + i + 6].wrapping_mul(sp));
+                    sum[7] = sum[7].wrapping_add(a[j * Self::N + i + 7].wrapping_mul(sp));
                 }
-                out[k_n + i] = out[k_n + i].wrapping_add(sum);
+
+                out[k_n + i] = out[k_n + i].wrapping_add(sum[0]);
+                out[k_n + i + 1] = out[k_n + i + 1].wrapping_add(sum[1]);
+                out[k_n + i + 2] = out[k_n + i + 2].wrapping_add(sum[2]);
+                out[k_n + i + 3] = out[k_n + i + 3].wrapping_add(sum[3]);
+                out[k_n + i + 4] = out[k_n + i + 4].wrapping_add(sum[4]);
+                out[k_n + i + 5] = out[k_n + i + 5].wrapping_add(sum[5]);
+                out[k_n + i + 6] = out[k_n + i + 6].wrapping_add(sum[6]);
+                out[k_n + i + 7] = out[k_n + i + 7].wrapping_add(sum[7]);
             }
         }
     }
@@ -469,16 +508,55 @@ pub trait Kem: Params + Expanded + Sample {
         debug_assert_eq!(e.len(), Self::N_BAR_X_N_BAR);
         debug_assert_eq!(out.len(), Self::N_BAR_X_N_BAR);
 
+        // Reference implementation
+        // for k in 0..Self::N_BAR {
+        //     let k_n = k * Self::N;
+        //     let k_bar = k * Self::N_BAR;
+        //     for i in 0..Self::N_BAR {
+        //         let mut sum = e[k_bar + i];
+        //         for j in 0..Self::N {
+        //             sum = sum.wrapping_add(s[k_n + j].wrapping_mul(b[j * Self::N_BAR + i]));
+        //         }
+        //         out[k_bar + i] = sum & Self::Q_MASK;
+        //     }
+        // }
+
+        // Unroll to process 8 columns at a time
         for k in 0..Self::N_BAR {
             let k_n = k * Self::N;
             let k_bar = k * Self::N_BAR;
-            for i in 0..Self::N_BAR {
-                let mut sum = e[k_bar + i];
-                for j in 0..Self::N {
-                    sum = sum.wrapping_add(s[k_n + j].wrapping_mul(b[j * Self::N_BAR + i]));
-                }
-                out[k_bar + i] = sum & Self::Q_MASK;
+
+            let mut sum = [
+                e[k_bar],
+                e[k_bar + 1],
+                e[k_bar + 2],
+                e[k_bar + 3],
+                e[k_bar + 4],
+                e[k_bar + 5],
+                e[k_bar + 6],
+                e[k_bar + 7],
+            ];
+
+            for j in 0..Self::N {
+                let sp = s[k_n + j];
+                sum[0] = sum[0].wrapping_add(sp.wrapping_mul(b[j * Self::N_BAR]));
+                sum[1] = sum[1].wrapping_add(sp.wrapping_mul(b[j * Self::N_BAR + 1]));
+                sum[2] = sum[2].wrapping_add(sp.wrapping_mul(b[j * Self::N_BAR + 2]));
+                sum[3] = sum[3].wrapping_add(sp.wrapping_mul(b[j * Self::N_BAR + 3]));
+                sum[4] = sum[4].wrapping_add(sp.wrapping_mul(b[j * Self::N_BAR + 4]));
+                sum[5] = sum[5].wrapping_add(sp.wrapping_mul(b[j * Self::N_BAR + 5]));
+                sum[6] = sum[6].wrapping_add(sp.wrapping_mul(b[j * Self::N_BAR + 6]));
+                sum[7] = sum[7].wrapping_add(sp.wrapping_mul(b[j * Self::N_BAR + 7]));
             }
+
+            out[k_bar] = sum[0] & Self::Q_MASK;
+            out[k_bar + 1] = sum[1] & Self::Q_MASK;
+            out[k_bar + 2] = sum[2] & Self::Q_MASK;
+            out[k_bar + 3] = sum[3] & Self::Q_MASK;
+            out[k_bar + 4] = sum[4] & Self::Q_MASK;
+            out[k_bar + 5] = sum[5] & Self::Q_MASK;
+            out[k_bar + 6] = sum[6] & Self::Q_MASK;
+            out[k_bar + 7] = sum[7] & Self::Q_MASK;
         }
     }
 
