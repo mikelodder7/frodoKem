@@ -62,6 +62,16 @@
 //! the necessary traits and models for creating a custom implementation.
 //! Be warned, this is not recommended unless you are sure of what you are doing.
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
+#![warn(
+    missing_docs,
+    missing_debug_implementations,
+    missing_copy_implementations,
+    trivial_casts,
+    trivial_numeric_casts,
+    unused,
+    clippy::mod_module_files
+)]
+#![deny(clippy::unwrap_used)]
 
 #[cfg(not(any(
     feature = "efrodo640aes",

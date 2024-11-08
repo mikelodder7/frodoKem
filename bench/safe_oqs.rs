@@ -1,3 +1,4 @@
+//! Benchmarking FrodoKEM against liboqs
 use criterion::{
     criterion_group, criterion_main, measurement::Measurement, BenchmarkGroup, Criterion,
 };
@@ -309,5 +310,6 @@ fn bench_against_liboqs(c: &mut Criterion) {
     group.finish();
 }
 
+/// Benchmark FrodoKEM against liboqs
 criterion_group!(benches, bench_against_liboqs);
 criterion_main!(benches);
