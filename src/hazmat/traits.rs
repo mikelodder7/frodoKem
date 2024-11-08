@@ -7,7 +7,7 @@ use crate::hazmat::{
     SharedSecret,
 };
 use rand_core::CryptoRngCore;
-use sha3::digest::{ExtendableOutput, ExtendableOutputReset, Update, XofReader};
+use sha3::digest::{ExtendableOutput, ExtendableOutputReset, Update};
 use subtle::{Choice, ConditionallySelectable};
 use zeroize::Zeroize;
 
@@ -136,15 +136,20 @@ pub trait Kem: Params + Expanded + Sample {
 
         shake.update(&[0x5F]);
         shake.update(randomness_seed_se);
-        let mut shake_reader = shake.finalize_xof_reset();
-        let mut u16_buffer = [0u8; 2];
-
         // 1st half is matrix S
         // 2nd half is matrix E
         let mut bytes_se = vec![0u16; Self::TWO_N_X_N_BAR];
-        for b in bytes_se.iter_mut() {
-            shake_reader.read(&mut u16_buffer);
-            *b = u16::from_le_bytes(u16_buffer);
+        {
+            let bytes_se = unsafe {
+                std::slice::from_raw_parts_mut(bytes_se.as_mut_ptr() as *mut u8, bytes_se.len() * 2)
+            };
+            shake.finalize_xof_reset_into(bytes_se);
+        }
+        #[cfg(target_endian = "big")]
+        {
+            for b in bytes_se.iter_mut() {
+                *b = b.to_be();
+            }
         }
 
         self.sample(&mut bytes_se);
@@ -177,7 +182,6 @@ pub trait Kem: Params + Expanded + Sample {
 
         bytes_se.zeroize();
         randomness.zeroize();
-        u16_buffer.zeroize();
 
         (pk, sk)
     }
@@ -230,11 +234,16 @@ pub trait Kem: Params + Expanded + Sample {
         let mut sp = vec![0u16; (2 * Self::N + Self::N_BAR) * Self::N_BAR];
         shake.update(&[0x96]);
         shake.update(&g2_out[..Self::BYTES_SEED_SE]);
-        let mut shake_reader = shake.finalize_xof_reset();
-        let mut u16_buffer = [0u8; 2];
-        for b in sp.iter_mut() {
-            shake_reader.read(&mut u16_buffer);
-            *b = u16::from_le_bytes(u16_buffer);
+        {
+            let bytes_sp =
+                unsafe { std::slice::from_raw_parts_mut(sp.as_mut_ptr() as *mut u8, sp.len() * 2) };
+            shake.finalize_xof_reset_into(bytes_sp);
+        }
+        #[cfg(target_endian = "big")]
+        {
+            for b in sp.iter_mut() {
+                *b = b.to_be();
+            }
         }
 
         self.sample(&mut sp);
@@ -343,11 +352,16 @@ pub trait Kem: Params + Expanded + Sample {
         let mut sp = vec![0u16; (2 * Self::N + Self::N_BAR) * Self::N_BAR];
         shake.update(&[0x96]);
         shake.update(&g2_out[..Self::BYTES_SEED_SE]);
-        let mut shake_reader = shake.finalize_xof_reset();
-        let mut u16_buffer = [0u8; 2];
-        for b in sp.iter_mut() {
-            shake_reader.read(&mut u16_buffer);
-            *b = u16::from_le_bytes(u16_buffer);
+        {
+            let bytes_sp =
+                unsafe { std::slice::from_raw_parts_mut(sp.as_mut_ptr() as *mut u8, sp.len() * 2) };
+            shake.finalize_xof_reset_into(bytes_sp);
+        }
+        #[cfg(target_endian = "big")]
+        {
+            for b in sp.iter_mut() {
+                *b = b.to_be();
+            }
         }
 
         self.sample(&mut sp);

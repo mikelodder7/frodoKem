@@ -4,14 +4,14 @@ categories = ["cryptography"]
 description = "A pure rust implementation of FrodoKEM and eFrodoKEM"
 documentation = "https://docs.rs/frodo-kem-rs"
 edition = "2021"
-exclude = ["tests/**", "bench/**", "examples/**", ".github/**"]
-homepage = "https://github.com/mikelodder7/frodoKem"
-keywords = ["quantum", "post", "zero", "knowledge", "encryption"]
+exclude = ["tests/**", "benches/**", "examples/**", ".github/**"]
+homepage = "https://crates.io/crates/frodo-kem-rs"
+keywords = ["post", "quantum", "kem"]
 license = "Apache-2.0 OR MIT"
 name = "frodo-kem-rs"
 readme = "README.md"
 repository = "https://github.com/mikelodder7/frodoKem"
-version = "0.3.1"
+version = "0.4.0"
 
 [features]
 default = [
@@ -62,13 +62,19 @@ serde = { version = "1.0", features = ["derive"], optional = true }
 serdect = "0.3.0-rc.0"
 subtle = "2.6"
 thiserror = "2.0"
-zeroize = "1"
 
 [target.'cfg(target_arch = "aarch64")'.dependencies]
 sha3 = { version = "0.10", features = ["asm"] }
+zeroize = { version = "1", features = ["aarch64"] }
+
+[target.'cfg(any(target_arch = "x86_64", target_arch = "x86"))'.dependencies]
+zeroize = { version = "1", features = ["simd"] }
 
 [target.'cfg(not(target_arch = "aarch64"))'.dependencies]
 sha3 = { version = "0.10" }
+
+[target.'cfg(not(any(target_arch = "x86_64", target_arch = "x86", target_arch = "aarch64")))'.dependencies]
+zeroize = "1"
 
 [dev-dependencies]
 aes = "0.8"
@@ -98,6 +104,11 @@ rustdoc-args = ["--cfg", "docsrs"]
 [[bench]]
 name = "safe-oqs"
 harness = false
-path = "bench/safe_oqs.rs"
+path = "benches/safe_oqs.rs"
 required-features = ["efrodo"]
 
+[[bench]]
+name = "frodo"
+harness = false
+path = "benches/frodo.rs"
+required-features = ["frodo"]

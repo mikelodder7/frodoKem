@@ -303,7 +303,7 @@ fn bench_decapsulate<'a, M: Measurement>(group: &mut BenchmarkGroup<'a, M>) {
 }
 
 fn bench_against_liboqs(c: &mut Criterion) {
-    let mut group = c.benchmark_group("FrodoKEM");
+    let mut group = c.benchmark_group("eFrodoKEM");
     bench_keygen(&mut group);
     bench_encapsulate(&mut group);
     bench_decapsulate(&mut group);
