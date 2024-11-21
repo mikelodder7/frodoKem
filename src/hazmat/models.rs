@@ -246,6 +246,12 @@ impl<P: Params> EncryptionKey<P> {
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct EncryptionKeyRef<'a, P: Params>(pub(crate) &'a [u8], pub(crate) PhantomData<P>);
 
+impl<P: Params> AsRef<[u8]> for EncryptionKeyRef<'_, P> {
+    fn as_ref(&self) -> &[u8] {
+        self.0
+    }
+}
+
 impl<'a, P: Params> EncryptionKeyRef<'a, P> {
     /// Create a public key reference
     pub fn from_slice(bytes: &'a [u8]) -> FrodoResult<Self> {
