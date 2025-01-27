@@ -1,6 +1,6 @@
 //! Benchmarking FrodoKEM against liboqs
 use criterion::{
-    BenchmarkGroup, Criterion, criterion_group, criterion_main, measurement::Measurement,
+    criterion_group, criterion_main, measurement::Measurement, BenchmarkGroup, Criterion,
 };
 use frodo_kem_rs::*;
 use rand_core::SeedableRng;

@@ -2,11 +2,11 @@
     Copyright Michael Lodder. All Rights Reserved.
     SPDX-License-Identifier: Apache-2.0
 */
-use crate::Error;
 use crate::hazmat::{
     Ciphertext, CiphertextRef, DecryptionKey, DecryptionKeyRef, EncryptionKey, EncryptionKeyRef,
     SharedSecret,
 };
+use crate::Error;
 use rand_core::{CryptoRng, TryCryptoRng};
 use sha3::digest::{ExtendableOutput, ExtendableOutputReset, Update};
 use subtle::{Choice, ConditionallySelectable};
