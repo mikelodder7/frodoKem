@@ -124,13 +124,10 @@ mod tests {
         assert_eq!(EphemeralFrodoKem640Shake::BYTES_SEED_A, 16);
         assert_eq!(EphemeralFrodoKem640Shake::BYTES_MU, 16);
         assert_eq!(EphemeralFrodoKem640Shake::BYTES_PK_HASH, 16);
-        assert_eq!(
-            EphemeralFrodoKem640Shake::CDF_TABLE,
-            &[
-                4643, 13363, 20579, 25843, 29227, 31145, 32103, 32525, 32689, 32745, 32762, 32766,
-                32767
-            ]
-        );
+        assert_eq!(EphemeralFrodoKem640Shake::CDF_TABLE, &[
+            4643, 13363, 20579, 25843, 29227, 31145, 32103, 32525, 32689, 32745, 32762, 32766,
+            32767
+        ]);
         assert_eq!(EphemeralFrodoKem640Shake::CLAIMED_NIST_LEVEL, 1);
         assert_eq!(EphemeralFrodoKem640Shake::SHARED_SECRET_LENGTH, 16);
         assert_eq!(EphemeralFrodoKem640Shake::METHOD, "SHAKE");

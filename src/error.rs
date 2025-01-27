@@ -25,6 +25,9 @@ pub enum Error {
     /// Parsing string to algorithm
     #[error("Unsupported algorithm")]
     UnsupportedAlgorithm,
+    /// The error from the supplied RNG
+    #[error("RNG error")]
+    RngError,
 }
 
 /// The result type for FrodoKEM

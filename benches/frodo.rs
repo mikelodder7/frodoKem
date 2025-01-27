@@ -1,5 +1,5 @@
 use criterion::{
-    criterion_group, criterion_main, measurement::Measurement, BenchmarkGroup, Criterion,
+    BenchmarkGroup, Criterion, criterion_group, criterion_main, measurement::Measurement,
 };
 use frodo_kem_rs::*;
 use rand_core::SeedableRng;

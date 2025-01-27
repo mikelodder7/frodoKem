@@ -3,7 +3,7 @@ authors = ["Michael Lodder <redmike7@gmail.com>"]
 categories = ["cryptography"]
 description = "A pure rust implementation of FrodoKEM and eFrodoKEM"
 documentation = "https://docs.rs/frodo-kem-rs"
-edition = "2021"
+edition = "2024"
 exclude = ["tests/**", "benches/**", "examples/**", ".github/**"]
 homepage = "https://crates.io/crates/frodo-kem-rs"
 keywords = ["post", "quantum", "kem"]
@@ -11,7 +11,7 @@ license = "Apache-2.0 OR MIT"
 name = "frodo-kem-rs"
 readme = "README.md"
 repository = "https://github.com/mikelodder7/frodoKem"
-version = "0.4.1"
+version = "0.5.0-rc0"
 
 [features]
 default = [
@@ -57,9 +57,9 @@ serde = ["dep:hex", "dep:serde"]
 aes = { version = "0.8", optional = true }
 hex = { version = "0.4", optional = true }
 openssl-sys = { version = "0.9.104", optional = true }
-rand_core = { version = "0.6", features = ["std"] }
+rand_core = { version = "0.9", features = ["std", "os_rng"] }
 serde = { version = "1.0", features = ["derive"], optional = true }
-serdect = "0.3.0-rc.0"
+serdect = "0.3.0"
 subtle = "2.6"
 thiserror = "2.0"
 
@@ -82,7 +82,7 @@ bincode = "1.3"
 criterion = "0.5"
 hex = "0.4"
 hybrid-array = "0.2"
-rand_chacha = "0.3"
+rand_chacha = "0.9"
 rstest = "0.24"
 safe-oqs = { version = "0.10", default-features = false, features = ["frodokem"] }
 postcard = { version = "1.0", features = ["use-std"] }

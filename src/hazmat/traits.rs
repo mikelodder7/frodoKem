@@ -2,11 +2,12 @@
     Copyright Michael Lodder. All Rights Reserved.
     SPDX-License-Identifier: Apache-2.0
 */
+use crate::Error;
 use crate::hazmat::{
     Ciphertext, CiphertextRef, DecryptionKey, DecryptionKeyRef, EncryptionKey, EncryptionKeyRef,
     SharedSecret,
 };
-use rand_core::CryptoRngCore;
+use rand_core::{CryptoRng, TryCryptoRng};
 use sha3::digest::{ExtendableOutput, ExtendableOutputReset, Update};
 use subtle::{Choice, ConditionallySelectable};
 use zeroize::Zeroize;
@@ -117,12 +118,34 @@ pub trait Kem: Params + Expanded + Sample {
     /// Algorithm 1 in [annex](https://frodokem.org/files/FrodoKEM-annex-20230418.pdf)
     fn generate_keypair(
         &self,
-        mut rng: impl CryptoRngCore,
+        mut rng: impl CryptoRng,
     ) -> (EncryptionKey<Self>, DecryptionKey<Self>) {
+        let mut seed = vec![0u8; Self::KEY_SEED_SIZE];
+        rng.fill_bytes(&mut seed);
+        self.generate_keypair_from_seed(&mut seed)
+    }
+
+    /// Try to generate a keypair
+    fn try_generate_keypair(
+        &self,
+        mut rng: impl TryCryptoRng,
+    ) -> Result<(EncryptionKey<Self>, DecryptionKey<Self>), Error> {
+        let mut seed = vec![0u8; Self::KEY_SEED_SIZE];
+        rng.try_fill_bytes(&mut seed).map_err(|_| Error::RngError)?;
+        Ok(self.generate_keypair_from_seed(&mut seed))
+    }
+
+    /// Generate a keypair from a seed.
+    ///
+    /// The seed is used as the randomness part of the keypair
+    /// and will be zeroized after the keypair is generated.
+    fn generate_keypair_from_seed(
+        &self,
+        randomness: &mut [u8],
+    ) -> (EncryptionKey<Self>, DecryptionKey<Self>) {
+        debug_assert_eq!(randomness.len(), Self::KEY_SEED_SIZE);
         let mut sk = DecryptionKey::default();
         let mut pk = EncryptionKey::default();
-        let mut randomness = vec![0u8; Self::KEY_SEED_SIZE];
-        rng.fill_bytes(&mut randomness);
 
         sk.random_s_mut()
             .copy_from_slice(&randomness[..Self::SHARED_SECRET_LENGTH]);
@@ -194,13 +217,26 @@ pub trait Kem: Params + Expanded + Sample {
     fn encapsulate_with_rng<'a, P: Into<EncryptionKeyRef<'a, Self>>>(
         &self,
         public_key: P,
-        mut rng: impl CryptoRngCore,
+        mut rng: impl CryptoRng,
     ) -> (Ciphertext<Self>, SharedSecret<Self>) {
         let mut mu = vec![0u8; Self::BYTES_MU + Self::BYTES_SALT];
         rng.fill_bytes(&mut mu);
         let res = self.encapsulate(public_key, &mu[..Self::BYTES_MU], &mu[Self::BYTES_MU..]);
         mu.zeroize();
         res
+    }
+
+    /// Try to encapsulate a random message into a ciphertext.
+    fn try_encapsulate_with_rng<'a, P: Into<EncryptionKeyRef<'a, Self>>>(
+        &self,
+        public_key: P,
+        mut rng: impl TryCryptoRng,
+    ) -> Result<(Ciphertext<Self>, SharedSecret<Self>), Error> {
+        let mut mu = vec![0u8; Self::BYTES_MU + Self::BYTES_SALT];
+        rng.try_fill_bytes(&mut mu).map_err(|_| Error::RngError)?;
+        let res = self.encapsulate(public_key, &mu[..Self::BYTES_MU], &mu[Self::BYTES_MU..]);
+        mu.zeroize();
+        Ok(res)
     }
 
     /// Encapsulate a message into a ciphertext.
