@@ -1769,7 +1769,7 @@ fn ct_eq_bytes(lhs: &[u8], rhs: &[u8]) -> Choice {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rand_core::{RngCore, SeedableRng};
+    use rand_core::{RngCore, SeedableRng, TryRngCore};
     use rstest::*;
     use safe_oqs::kem;
 
@@ -1830,6 +1830,27 @@ mod tests {
         rng.fill_bytes(&mut mu);
         let mut salt = vec![0u8; alg.params().salt_length];
         rng.fill_bytes(&mut salt);
+        let (our_ct, our_ess) = alg.encapsulate(&our_pk, &mu, &salt).unwrap();
+        let (our_dss, mu_prime) = alg.decapsulate(&our_sk, &our_ct).unwrap();
+        assert_eq!(our_ess.value, our_dss.value);
+        assert_eq!(mu, mu_prime);
+    }
+
+    #[rstest]
+    #[case::aes640(Algorithm::FrodoKem640Aes)]
+    #[case::aes976(Algorithm::FrodoKem976Aes)]
+    #[case::aes1344(Algorithm::FrodoKem1344Aes)]
+    #[case::shake640(Algorithm::FrodoKem640Shake)]
+    #[case::shake976(Algorithm::FrodoKem976Shake)]
+    #[case::shake1344(Algorithm::FrodoKem1344Shake)]
+    fn works_with_os_rng(#[case] alg: Algorithm) {
+        let mut rng = rand_core::OsRng;
+        let (our_pk, our_sk) = alg.try_generate_keypair(rng).unwrap();
+
+        let mut mu = vec![0u8; alg.params().message_length];
+        rng.try_fill_bytes(&mut mu).unwrap();
+        let mut salt = vec![0u8; alg.params().salt_length];
+        rng.try_fill_bytes(&mut salt).unwrap();
         let (our_ct, our_ess) = alg.encapsulate(&our_pk, &mu, &salt).unwrap();
         let (our_dss, mu_prime) = alg.decapsulate(&our_sk, &our_ct).unwrap();
         assert_eq!(our_ess.value, our_dss.value);

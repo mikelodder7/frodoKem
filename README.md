@@ -26,7 +26,7 @@ USE AT YOUR OWN RISK!
 
 ## Minimum Supported Rust Version
 
-This crate requires **Rust 1.82** at a minimum.
+This crate requires **Rust 1.85** at a minimum.
 
 We may change the MSRV in the future, but it will be accompanied by a minor
 version bump.
@@ -60,7 +60,7 @@ When in doubt use the FrodoKEM algorithm variants.
 To speed up AES, there are a few options available:
 
 - `RUSTFLAGS="--cfg aes_armv8" cargo build --release` ensures that the ARMv8 AES instructions are used if available.
-- `frodo-kem-rs = { version = "0.3", features = ["openssl"] }` uses the `openssl` crate for AES.
+- `frodo-kem-rs = { version = "0.5", features = ["openssl"] }` uses the `openssl` crate for AES.
 
 By default, the `aes` feature auto-detects the best AES implementation for your platform
 for x86 and x86_64,
@@ -112,4 +112,4 @@ conditions.
 [docs-link]: https://docs.rs/frodo-kem-rs/
 [license-image]: https://img.shields.io/badge/license-Apache2.0/MIT-blue.svg
 [downloads-image]: https://img.shields.io/crates/d/frodo-kem-rs.svg
-[msrv-image]: https://img.shields.io/badge/rustc-1.82+-blue.svg
+[msrv-image]: https://img.shields.io/badge/rustc-1.85+-blue.svg
