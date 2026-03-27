@@ -1,12 +1,13 @@
 //! Benchmarking FrodoKEM against liboqs
 use criterion::{
-    criterion_group, criterion_main, measurement::Measurement, BenchmarkGroup, Criterion,
+    BenchmarkGroup, Criterion, criterion_group, criterion_main, measurement::Measurement,
 };
 use frodo_kem_rs::*;
-use rand_core::SeedableRng;
+use rand::rngs::SysRng;
+use rand_core::{SeedableRng, UnwrapErr};
 
 fn bench_keygen<'a, M: Measurement>(group: &mut BenchmarkGroup<'a, M>) {
-    let mut rng = rand_chacha::ChaCha8Rng::from_os_rng();
+    let mut rng = rand_chacha::ChaCha8Rng::from_rng(&mut UnwrapErr(SysRng));
     group.bench_function("KeyGen 640Aes", |b| {
         b.iter(|| {
             let (_pk, _sk) = Algorithm::EphemeralFrodoKem640Aes.generate_keypair(&mut rng);
@@ -81,7 +82,7 @@ fn bench_keygen<'a, M: Measurement>(group: &mut BenchmarkGroup<'a, M>) {
 }
 
 fn bench_encapsulate<'a, M: Measurement>(group: &mut BenchmarkGroup<'a, M>) {
-    let mut rng = rand_chacha::ChaCha8Rng::from_os_rng();
+    let mut rng = rand_chacha::ChaCha8Rng::from_rng(&mut UnwrapErr(SysRng));
     let (pk, _sk) = Algorithm::EphemeralFrodoKem640Aes.generate_keypair(&mut rng);
     group.bench_function("Encapsulate 640Aes", |b| {
         b.iter(|| {
@@ -180,7 +181,7 @@ fn bench_encapsulate<'a, M: Measurement>(group: &mut BenchmarkGroup<'a, M>) {
 }
 
 fn bench_decapsulate<'a, M: Measurement>(group: &mut BenchmarkGroup<'a, M>) {
-    let mut rng = rand_chacha::ChaCha8Rng::from_os_rng();
+    let mut rng = rand_chacha::ChaCha8Rng::from_rng(&mut UnwrapErr(SysRng));
     let (pk, sk) = Algorithm::EphemeralFrodoKem640Aes.generate_keypair(&mut rng);
     let (ct, _ss) = Algorithm::EphemeralFrodoKem640Aes
         .encapsulate_with_rng(&pk, &mut rng)

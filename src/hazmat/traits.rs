@@ -6,8 +6,7 @@ use crate::hazmat::{
     Ciphertext, CiphertextRef, DecryptionKey, DecryptionKeyRef, EncryptionKey, EncryptionKeyRef,
     SharedSecret,
 };
-use crate::Error;
-use rand_core::{CryptoRng, TryCryptoRng};
+use rand_core::CryptoRng;
 use sha3::digest::{ExtendableOutput, ExtendableOutputReset, Update};
 use subtle::{Choice, ConditionallySelectable};
 use zeroize::Zeroize;
@@ -71,6 +70,7 @@ pub trait Params: Sized + Default {
     const KEY_SEED_SIZE: usize =
         Self::SHARED_SECRET_LENGTH + Self::BYTES_SEED_A + Self::BYTES_SEED_SE;
     /// 2 * N
+    #[allow(dead_code)]
     const TWO_N: usize = 2 * Self::N;
     /// 2 + SEED_A
     const TWO_PLUS_BYTES_SEED_A: usize = 2 + Self::BYTES_SEED_A;
@@ -123,16 +123,6 @@ pub trait Kem: Params + Expanded + Sample {
         let mut seed = vec![0u8; Self::KEY_SEED_SIZE];
         rng.fill_bytes(&mut seed);
         self.generate_keypair_from_seed(&mut seed)
-    }
-
-    /// Try to generate a keypair
-    fn try_generate_keypair(
-        &self,
-        mut rng: impl TryCryptoRng,
-    ) -> Result<(EncryptionKey<Self>, DecryptionKey<Self>), Error> {
-        let mut seed = vec![0u8; Self::KEY_SEED_SIZE];
-        rng.try_fill_bytes(&mut seed).map_err(|_| Error::RngError)?;
-        Ok(self.generate_keypair_from_seed(&mut seed))
     }
 
     /// Generate a keypair from a seed.
@@ -224,19 +214,6 @@ pub trait Kem: Params + Expanded + Sample {
         let res = self.encapsulate(public_key, &mu[..Self::BYTES_MU], &mu[Self::BYTES_MU..]);
         mu.zeroize();
         res
-    }
-
-    /// Try to encapsulate a random message into a ciphertext.
-    fn try_encapsulate_with_rng<'a, P: Into<EncryptionKeyRef<'a, Self>>>(
-        &self,
-        public_key: P,
-        mut rng: impl TryCryptoRng,
-    ) -> Result<(Ciphertext<Self>, SharedSecret<Self>), Error> {
-        let mut mu = vec![0u8; Self::BYTES_MU + Self::BYTES_SALT];
-        rng.try_fill_bytes(&mut mu).map_err(|_| Error::RngError)?;
-        let res = self.encapsulate(public_key, &mu[..Self::BYTES_MU], &mu[Self::BYTES_MU..]);
-        mu.zeroize();
-        Ok(res)
     }
 
     /// Encapsulate a message into a ciphertext.

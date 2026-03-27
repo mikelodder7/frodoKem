@@ -11,7 +11,7 @@ license = "Apache-2.0 OR MIT"
 name = "frodo-kem-rs"
 readme = "README.md"
 repository = "https://github.com/mikelodder7/frodoKem"
-version = "0.5.0"
+version = "0.6.0"
 
 [features]
 default = [
@@ -57,7 +57,7 @@ serde = ["dep:hex", "dep:serde"]
 aes = { version = "0.8", optional = true }
 hex = { version = "0.4", optional = true }
 openssl-sys = { version = "0.9.106", optional = true }
-rand_core = { version = "0.9", features = ["std", "os_rng"] }
+rand_core = "0.10"
 serde = { version = "1.0", features = ["derive"], optional = true }
 serdect = "0.3"
 subtle = "2.6"
@@ -82,7 +82,8 @@ bincode = "1.3"
 criterion = "0.5"
 hex = "0.4"
 hybrid-array = "0.3"
-rand_chacha = "0.9"
+rand = { version = "0.10", features = ["sys_rng"] }
+rand_chacha = "0.10"
 rstest = "0.24"
 safe-oqs = { version = "0.10", default-features = false, features = ["frodokem"] }
 postcard = { version = "1.0", features = ["use-std"] }

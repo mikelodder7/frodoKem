@@ -109,6 +109,7 @@ pub type EphemeralFrodoKem1344Shake = EphemeralFrodoKem<
 >;
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
     use rand_core::SeedableRng;
@@ -189,7 +190,7 @@ mod tests {
         assert_eq!(my_ess.as_ref(), my_ss.as_ref());
 
         let their_ct = safe_kem.ciphertext_from_bytes(my_ct.as_ref()).unwrap();
-        let their_ss = safe_kem.decapsulate(&their_sk, &their_ct).unwrap();
+        let their_ss = safe_kem.decapsulate(&their_sk, their_ct).unwrap();
         assert_eq!(my_ess.as_ref(), their_ss.as_ref());
 
         let (their_ct, their_ess) = safe_kem.encapsulate(&their_pk).unwrap();
@@ -239,8 +240,8 @@ mod tests {
         let their_pk = opt_pk.unwrap();
         let their_sk = opt_sk.unwrap();
 
-        let (ciphertext, pk_ss) = kem.encapsulate(&their_pk).unwrap();
-        let sk_ss = kem.decapsulate(&their_sk, &ciphertext).unwrap();
+        let (ciphertext, pk_ss) = kem.encapsulate(their_pk).unwrap();
+        let sk_ss = kem.decapsulate(their_sk, &ciphertext).unwrap();
         assert_eq!(pk_ss.as_ref(), sk_ss.as_ref());
     }
 
@@ -284,7 +285,7 @@ mod tests {
         let opt_ct = safe_kem.ciphertext_from_bytes(&our_ciphertext.0);
         assert!(opt_ct.is_some());
         let ct = opt_ct.unwrap();
-        let res_ss = safe_kem.decapsulate(&their_sk, &ct);
+        let res_ss = safe_kem.decapsulate(their_sk, ct);
         assert!(res_ss.is_ok());
         let their = res_ss.unwrap();
         assert_eq!(our_ss.as_ref(), their.as_ref());
@@ -331,7 +332,7 @@ mod tests {
         let (opt_ss, _) = kem.decapsulate(&our_sk, &our_ciphertext);
         assert_eq!(opt_ss.as_ref(), our_ss.as_ref());
 
-        let (their_ct, their_ss) = safe_kem.encapsulate(&their_pk).unwrap();
+        let (their_ct, their_ss) = safe_kem.encapsulate(their_pk).unwrap();
         let res_my_ciphertext = Ciphertext::from_slice(their_ct.as_ref());
         assert!(res_my_ciphertext.is_ok());
         let my_ciphertext = res_my_ciphertext.unwrap();

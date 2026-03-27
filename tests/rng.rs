@@ -1,17 +1,17 @@
 //! Random number generator for testing
 //! AES-CTR DRBG
 use aes::{
-    cipher::{BlockEncrypt, KeyInit},
     Aes256Enc, Block,
+    cipher::{BlockEncrypt, KeyInit},
 };
-use hybrid_array::{typenum::U48, Array};
-use rand_core::{CryptoRng, RngCore, SeedableRng};
+use hybrid_array::{Array, typenum::U48};
+use rand_core::{SeedableRng, TryCryptoRng, TryRng};
 
 /// Seed type for the AES-CTR DRBG
 pub type RngSeed = Array<u8, U48>;
 
 /// AES-CTR DRBG
-#[derive(Debug, Default, Copy, Clone)]
+#[derive(Debug, Default, Clone)]
 pub struct AesCtrDrbg {
     reseed_counter: usize,
     key: [u8; 32],
@@ -29,20 +29,22 @@ impl SeedableRng for AesCtrDrbg {
     }
 }
 
-impl RngCore for AesCtrDrbg {
-    fn next_u32(&mut self) -> u32 {
+impl TryRng for AesCtrDrbg {
+    type Error = core::convert::Infallible;
+
+    fn try_next_u32(&mut self) -> Result<u32, Self::Error> {
         let mut int = [0u8; 4];
-        self.fill_bytes(&mut int);
-        u32::from_le_bytes(int)
+        self.try_fill_bytes(&mut int)?;
+        Ok(u32::from_le_bytes(int))
     }
 
-    fn next_u64(&mut self) -> u64 {
+    fn try_next_u64(&mut self) -> Result<u64, Self::Error> {
         let mut int = [0u8; 8];
-        self.fill_bytes(&mut int);
-        u64::from_le_bytes(int)
+        self.try_fill_bytes(&mut int)?;
+        Ok(u64::from_le_bytes(int))
     }
 
-    fn fill_bytes(&mut self, dest: &mut [u8]) {
+    fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), Self::Error> {
         let mut in_block = Block::default();
         let mut out_block = Block::default();
         let enc = Aes256Enc::new_from_slice(&self.key).unwrap();
@@ -64,10 +66,11 @@ impl RngCore for AesCtrDrbg {
 
         self.update(None);
         self.reseed_counter += 1;
+        Ok(())
     }
 }
 
-impl CryptoRng for AesCtrDrbg {}
+impl TryCryptoRng for AesCtrDrbg {}
 
 impl AesCtrDrbg {
     /// Reseed the DRBG with a new seed

@@ -10,11 +10,12 @@
 //!
 //! ```
 //! use frodo_kem_rs::Algorithm;
-//! use rand_core::OsRng;
+//! use rand_core::{CryptoRng, UnwrapErr};
+//! use rand::rngs::SysRng;
 //!
 //! let alg = Algorithm::FrodoKem640Shake;
-//! let (ek, dk) = alg.try_generate_keypair(OsRng).unwrap();
-//! let (ct, enc_ss) = alg.try_encapsulate_with_rng(&ek, OsRng).unwrap();
+//! let (ek, dk) = alg.generate_keypair(UnwrapErr(SysRng));
+//! let (ct, enc_ss) = alg.encapsulate_with_rng(&ek, UnwrapErr(SysRng)).unwrap();
 //! let (dec_ss, msg) = alg.decapsulate(&dk, &ct).unwrap();
 //!
 //! assert_eq!(enc_ss, dec_ss);
@@ -31,15 +32,16 @@
 //!
 //! ```
 //! use frodo_kem_rs::Algorithm;
-//! use rand_core::{TryRngCore, OsRng};
+//! use rand::rngs::SysRng;
+//! use rand_core::{Rng, UnwrapErr};
 //!
 //! let alg = Algorithm::FrodoKem1344Shake;
 //! let params = alg.params();
-//! let (ek, dk) = alg.try_generate_keypair(OsRng).unwrap();
+//! let (ek, dk) = alg.generate_keypair(UnwrapErr(SysRng));
 //! // Key is known, generate
 //! let aes_256_key = vec![3u8; params.message_length];
 //! let mut salt = vec![0u8; params.salt_length];
-//! OsRng.try_fill_bytes(&mut salt).unwrap();
+//! UnwrapErr(SysRng).fill_bytes(&mut salt);
 //! let (ct, enc_ss) = alg.encapsulate(&ek, &aes_256_key, &salt).unwrap();
 //! let (dec_ss, dec_msg) = alg.decapsulate(&dk, &ct).unwrap();
 //!
@@ -100,7 +102,7 @@ mod hazmat;
 
 use hazmat::*;
 
-use rand_core::{CryptoRng, TryCryptoRng};
+use rand_core::CryptoRng;
 use std::marker::PhantomData;
 use subtle::{Choice, ConstantTimeEq};
 use zeroize::{Zeroize, ZeroizeOnDrop};
@@ -1337,68 +1339,6 @@ impl Algorithm {
         )
     }
 
-    /// Try to generate a new keypair consisting of a [`EncryptionKey`] and a [`DecryptionKey`]
-    pub fn try_generate_keypair(
-        &self,
-        rng: impl TryCryptoRng,
-    ) -> FrodoResult<(EncryptionKey, DecryptionKey)> {
-        match self {
-            #[cfg(feature = "frodo640aes")]
-            Self::FrodoKem640Aes => self.try_inner_generate_keypair::<FrodoKem640Aes>(rng),
-            #[cfg(feature = "frodo976aes")]
-            Self::FrodoKem976Aes => self.try_inner_generate_keypair::<FrodoKem976Aes>(rng),
-            #[cfg(feature = "frodo1344aes")]
-            Self::FrodoKem1344Aes => self.try_inner_generate_keypair::<FrodoKem1344Aes>(rng),
-            #[cfg(feature = "frodo640shake")]
-            Self::FrodoKem640Shake => self.try_inner_generate_keypair::<FrodoKem640Shake>(rng),
-            #[cfg(feature = "frodo976shake")]
-            Self::FrodoKem976Shake => self.try_inner_generate_keypair::<FrodoKem976Shake>(rng),
-            #[cfg(feature = "frodo1344shake")]
-            Self::FrodoKem1344Shake => self.try_inner_generate_keypair::<FrodoKem1344Shake>(rng),
-            #[cfg(feature = "efrodo640aes")]
-            Self::EphemeralFrodoKem640Aes => {
-                self.try_inner_generate_keypair::<EphemeralFrodoKem640Aes>(rng)
-            }
-            #[cfg(feature = "efrodo976aes")]
-            Self::EphemeralFrodoKem976Aes => {
-                self.try_inner_generate_keypair::<EphemeralFrodoKem976Aes>(rng)
-            }
-            #[cfg(feature = "efrodo1344aes")]
-            Self::EphemeralFrodoKem1344Aes => {
-                self.try_inner_generate_keypair::<EphemeralFrodoKem1344Aes>(rng)
-            }
-            #[cfg(feature = "efrodo640shake")]
-            Self::EphemeralFrodoKem640Shake => {
-                self.try_inner_generate_keypair::<EphemeralFrodoKem640Shake>(rng)
-            }
-            #[cfg(feature = "efrodo976shake")]
-            Self::EphemeralFrodoKem976Shake => {
-                self.try_inner_generate_keypair::<EphemeralFrodoKem976Shake>(rng)
-            }
-            #[cfg(feature = "efrodo1344shake")]
-            Self::EphemeralFrodoKem1344Shake => {
-                self.try_inner_generate_keypair::<EphemeralFrodoKem1344Shake>(rng)
-            }
-        }
-    }
-
-    fn try_inner_generate_keypair<K: Kem>(
-        &self,
-        rng: impl TryCryptoRng,
-    ) -> FrodoResult<(EncryptionKey, DecryptionKey)> {
-        let (pk, sk) = K::default().try_generate_keypair(rng)?;
-        Ok((
-            EncryptionKey {
-                algorithm: *self,
-                value: pk.0,
-            },
-            DecryptionKey {
-                algorithm: *self,
-                value: sk.0,
-            },
-        ))
-    }
-
     /// Encapsulate with given message to generate a [`SharedSecret`] and a [`Ciphertext`].
     ///
     /// NOTE: The message and salt must be of the correct length for the algorithm.
@@ -1560,83 +1500,6 @@ impl Algorithm {
         ))
     }
 
-    /// Try to encapsulate a random value to generate a [`SharedSecret`] and a [`Ciphertext`].
-    pub fn try_encapsulate_with_rng(
-        &self,
-        public_key: &EncryptionKey,
-        rng: impl TryCryptoRng,
-    ) -> FrodoResult<(Ciphertext, SharedSecret)> {
-        match self {
-            #[cfg(feature = "frodo640aes")]
-            Self::FrodoKem640Aes => {
-                self.try_inner_encapsulate_with_rng::<FrodoKem640Aes>(public_key, rng)
-            }
-            #[cfg(feature = "frodo976aes")]
-            Self::FrodoKem976Aes => {
-                self.try_inner_encapsulate_with_rng::<FrodoKem976Aes>(public_key, rng)
-            }
-            #[cfg(feature = "frodo1344aes")]
-            Self::FrodoKem1344Aes => {
-                self.try_inner_encapsulate_with_rng::<FrodoKem1344Aes>(public_key, rng)
-            }
-            #[cfg(feature = "frodo640shake")]
-            Self::FrodoKem640Shake => {
-                self.try_inner_encapsulate_with_rng::<FrodoKem640Shake>(public_key, rng)
-            }
-            #[cfg(feature = "frodo976shake")]
-            Self::FrodoKem976Shake => {
-                self.try_inner_encapsulate_with_rng::<FrodoKem976Shake>(public_key, rng)
-            }
-            #[cfg(feature = "frodo1344shake")]
-            Self::FrodoKem1344Shake => {
-                self.try_inner_encapsulate_with_rng::<FrodoKem1344Shake>(public_key, rng)
-            }
-            #[cfg(feature = "efrodo640aes")]
-            Self::EphemeralFrodoKem640Aes => {
-                self.try_inner_encapsulate_with_rng::<EphemeralFrodoKem640Aes>(public_key, rng)
-            }
-            #[cfg(feature = "efrodo976aes")]
-            Self::EphemeralFrodoKem976Aes => {
-                self.try_inner_encapsulate_with_rng::<EphemeralFrodoKem976Aes>(public_key, rng)
-            }
-            #[cfg(feature = "efrodo1344aes")]
-            Self::EphemeralFrodoKem1344Aes => {
-                self.try_inner_encapsulate_with_rng::<EphemeralFrodoKem1344Aes>(public_key, rng)
-            }
-            #[cfg(feature = "efrodo640shake")]
-            Self::EphemeralFrodoKem640Shake => {
-                self.try_inner_encapsulate_with_rng::<EphemeralFrodoKem640Shake>(public_key, rng)
-            }
-            #[cfg(feature = "efrodo976shake")]
-            Self::EphemeralFrodoKem976Shake => {
-                self.try_inner_encapsulate_with_rng::<EphemeralFrodoKem976Shake>(public_key, rng)
-            }
-            #[cfg(feature = "efrodo1344shake")]
-            Self::EphemeralFrodoKem1344Shake => {
-                self.try_inner_encapsulate_with_rng::<EphemeralFrodoKem1344Shake>(public_key, rng)
-            }
-        }
-    }
-
-    fn try_inner_encapsulate_with_rng<K: Kem>(
-        &self,
-        encryption_key: &EncryptionKey,
-        rng: impl TryCryptoRng,
-    ) -> FrodoResult<(Ciphertext, SharedSecret)> {
-        let pk = EncryptionKeyRef::from_slice(encryption_key.value.as_slice())?;
-        let (ct, ss) = K::default().try_encapsulate_with_rng(pk, rng)?;
-        Ok((
-            Ciphertext {
-                algorithm: *self,
-                value: ct.0,
-            },
-            SharedSecret {
-                algorithm: *self,
-                value: ss.0,
-            },
-        ))
-    }
-
     /// Decapsulate the [`Ciphertext`] to return the [`SharedSecret`] and
     /// message generated during encapsulation.
     pub fn decapsulate(
@@ -1767,9 +1630,11 @@ fn ct_eq_bytes(lhs: &[u8], rhs: &[u8]) -> Choice {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
-    use rand_core::{RngCore, SeedableRng, TryRngCore};
+    use rand::rngs::SysRng;
+    use rand_core::{Rng, SeedableRng, UnwrapErr};
     use rstest::*;
     use safe_oqs::kem;
 
@@ -1798,18 +1663,18 @@ mod tests {
 
         let mut mu = vec![0u8; alg.params().message_length];
         rng.fill_bytes(&mut mu);
-        let (our_ct, our_ess) = alg.encapsulate(&our_pk, &mu, &[]).unwrap();
+        let (our_ct, our_ess) = alg.encapsulate(&our_pk, &mu, []).unwrap();
         let (our_dss, mu_prime) = alg.decapsulate(&our_sk, &our_ct).unwrap();
         assert_eq!(our_ess.value, our_dss.value);
         assert_eq!(mu, mu_prime);
 
         let their_ct = kem.ciphertext_from_bytes(&our_ct.value).unwrap();
-        let their_ss = kem.decapsulate(&their_sk, &their_ct).unwrap();
+        let their_ss = kem.decapsulate(their_sk, their_ct).unwrap();
         assert_eq!(our_dss.value, their_ss.as_ref());
 
-        let (their_ct, their_ess) = kem.encapsulate(&their_pk).unwrap();
+        let (their_ct, their_ess) = kem.encapsulate(their_pk).unwrap();
 
-        let our_ct = alg.ciphertext_from_bytes(&their_ct.as_ref()).unwrap();
+        let our_ct = alg.ciphertext_from_bytes(their_ct.as_ref()).unwrap();
 
         let (their_dss, _) = alg.decapsulate(&our_sk, &our_ct).unwrap();
         assert_eq!(their_ess.as_ref(), their_dss.value);
@@ -1844,13 +1709,12 @@ mod tests {
     #[case::shake976(Algorithm::FrodoKem976Shake)]
     #[case::shake1344(Algorithm::FrodoKem1344Shake)]
     fn works_with_os_rng(#[case] alg: Algorithm) {
-        let mut rng = rand_core::OsRng;
-        let (our_pk, our_sk) = alg.try_generate_keypair(rng).unwrap();
+        let (our_pk, our_sk) = alg.generate_keypair(UnwrapErr(SysRng));
 
         let mut mu = vec![0u8; alg.params().message_length];
-        rng.try_fill_bytes(&mut mu).unwrap();
+        UnwrapErr(SysRng).fill_bytes(&mut mu);
         let mut salt = vec![0u8; alg.params().salt_length];
-        rng.try_fill_bytes(&mut salt).unwrap();
+        UnwrapErr(SysRng).fill_bytes(&mut salt);
         let (our_ct, our_ess) = alg.encapsulate(&our_pk, &mu, &salt).unwrap();
         let (our_dss, mu_prime) = alg.decapsulate(&our_sk, &our_ct).unwrap();
         assert_eq!(our_ess.value, our_dss.value);
