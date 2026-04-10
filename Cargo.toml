@@ -54,7 +54,7 @@ openssl-shake = ["dep:openssl-sys"]
 serde = ["dep:hex", "dep:serde"]
 
 [dependencies]
-aes = { version = "0.8", optional = true }
+aes = { version = "0.9", optional = true }
 hex = { version = "0.4", optional = true }
 openssl-sys = { version = "0.9.106", optional = true }
 rand_core = "0.10"
@@ -77,7 +77,7 @@ sha3 = { version = "0.10" }
 zeroize = "1"
 
 [dev-dependencies]
-aes = "0.8"
+aes = "0.9"
 criterion = "0.8"
 hex = "0.4"
 hybrid-array = "0.4"
