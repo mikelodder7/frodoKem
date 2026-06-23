@@ -7,7 +7,7 @@ use crate::hazmat::{
     SharedSecret,
 };
 use rand_core::CryptoRng;
-use sha3::digest::{ExtendableOutput, ExtendableOutputReset, Update};
+use shake::digest::{ExtendableOutput, ExtendableOutputReset, Update};
 use subtle::{Choice, ConditionallySelectable};
 use zeroize::Zeroize;
 

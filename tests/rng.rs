@@ -2,7 +2,7 @@
 //! AES-CTR DRBG
 use aes::{
     Aes256Enc, Block,
-    cipher::{BlockEncrypt, KeyInit},
+    cipher::{BlockCipherEncrypt, KeyInit},
 };
 use hybrid_array::{Array, typenum::U48};
 use rand_core::{SeedableRng, TryCryptoRng, TryRng};
