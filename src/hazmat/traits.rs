@@ -454,13 +454,38 @@ pub trait Kem: Params + Expanded + Sample {
         for i in 0..Self::N {
             let i_bar = i * Self::N_BAR;
             let i_n = i * Self::N;
-            for k in 0..Self::N_BAR {
-                let mut sum = e[i_bar + k];
-                for j in 0..Self::N {
-                    sum = sum.wrapping_add(a[i_n + j].wrapping_mul(s[k * Self::N + j]));
-                }
-                b[i_bar + k] = b[i_bar + k].wrapping_add(sum);
+
+            let mut sum = [
+                e[i_bar],
+                e[i_bar + 1],
+                e[i_bar + 2],
+                e[i_bar + 3],
+                e[i_bar + 4],
+                e[i_bar + 5],
+                e[i_bar + 6],
+                e[i_bar + 7],
+            ];
+
+            for j in 0..Self::N {
+                let aij = a[i_n + j];
+                sum[0] = sum[0].wrapping_add(aij.wrapping_mul(s[j]));
+                sum[1] = sum[1].wrapping_add(aij.wrapping_mul(s[Self::N + j]));
+                sum[2] = sum[2].wrapping_add(aij.wrapping_mul(s[2 * Self::N + j]));
+                sum[3] = sum[3].wrapping_add(aij.wrapping_mul(s[3 * Self::N + j]));
+                sum[4] = sum[4].wrapping_add(aij.wrapping_mul(s[4 * Self::N + j]));
+                sum[5] = sum[5].wrapping_add(aij.wrapping_mul(s[5 * Self::N + j]));
+                sum[6] = sum[6].wrapping_add(aij.wrapping_mul(s[6 * Self::N + j]));
+                sum[7] = sum[7].wrapping_add(aij.wrapping_mul(s[7 * Self::N + j]));
             }
+
+            b[i_bar] = b[i_bar].wrapping_add(sum[0]);
+            b[i_bar + 1] = b[i_bar + 1].wrapping_add(sum[1]);
+            b[i_bar + 2] = b[i_bar + 2].wrapping_add(sum[2]);
+            b[i_bar + 3] = b[i_bar + 3].wrapping_add(sum[3]);
+            b[i_bar + 4] = b[i_bar + 4].wrapping_add(sum[4]);
+            b[i_bar + 5] = b[i_bar + 5].wrapping_add(sum[5]);
+            b[i_bar + 6] = b[i_bar + 6].wrapping_add(sum[6]);
+            b[i_bar + 7] = b[i_bar + 7].wrapping_add(sum[7]);
         }
     }
 
@@ -596,13 +621,29 @@ pub trait Kem: Params + Expanded + Sample {
         for i in 0..Self::N_BAR {
             let i_n = i * Self::N;
             let i_bar = i * Self::N_BAR;
-            for j in 0..Self::N_BAR {
-                let mut sum = 0u16;
-                for k in 0..Self::N {
-                    sum = sum.wrapping_add(b[i_n + k].wrapping_mul(s[j * Self::N + k]));
-                }
-                out[i_bar + j] = sum & Self::Q_MASK;
+
+            let mut sum = [0u16; 8];
+
+            for k in 0..Self::N {
+                let bik = b[i_n + k];
+                sum[0] = sum[0].wrapping_add(bik.wrapping_mul(s[k]));
+                sum[1] = sum[1].wrapping_add(bik.wrapping_mul(s[Self::N + k]));
+                sum[2] = sum[2].wrapping_add(bik.wrapping_mul(s[2 * Self::N + k]));
+                sum[3] = sum[3].wrapping_add(bik.wrapping_mul(s[3 * Self::N + k]));
+                sum[4] = sum[4].wrapping_add(bik.wrapping_mul(s[4 * Self::N + k]));
+                sum[5] = sum[5].wrapping_add(bik.wrapping_mul(s[5 * Self::N + k]));
+                sum[6] = sum[6].wrapping_add(bik.wrapping_mul(s[6 * Self::N + k]));
+                sum[7] = sum[7].wrapping_add(bik.wrapping_mul(s[7 * Self::N + k]));
             }
+
+            out[i_bar] = sum[0] & Self::Q_MASK;
+            out[i_bar + 1] = sum[1] & Self::Q_MASK;
+            out[i_bar + 2] = sum[2] & Self::Q_MASK;
+            out[i_bar + 3] = sum[3] & Self::Q_MASK;
+            out[i_bar + 4] = sum[4] & Self::Q_MASK;
+            out[i_bar + 5] = sum[5] & Self::Q_MASK;
+            out[i_bar + 6] = sum[6] & Self::Q_MASK;
+            out[i_bar + 7] = sum[7] & Self::Q_MASK;
         }
     }
 
