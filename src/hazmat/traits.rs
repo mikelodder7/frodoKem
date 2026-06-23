@@ -720,6 +720,30 @@ pub trait Kem: Params + Expanded + Sample {
     ///
     /// See Algorithm 3 in the [spec](https://frodokem.org/files/FrodoKEM-specification-20210604.pdf).
     fn pack(&self, input: &[u16], output: &mut [u8]) {
+        if Self::LOG_Q == 16 {
+            debug_assert_eq!(output.len(), input.len() * 2);
+            for (word, out) in input.iter().zip(output.chunks_exact_mut(2)) {
+                out.copy_from_slice(&word.to_be_bytes());
+            }
+            return;
+        }
+
+        if Self::LOG_Q == 15 {
+            debug_assert_eq!(input.len() % 8, 0);
+            debug_assert_eq!(output.len(), (input.len() * 15) / 8);
+
+            for (input, output) in input.chunks_exact(8).zip(output.chunks_exact_mut(15)) {
+                let mut acc = 0u128;
+                for word in input {
+                    acc = (acc << 15) | u128::from(word & Self::Q_MASK);
+                }
+                for (i, out) in output.iter_mut().enumerate() {
+                    *out = (acc >> (8 * (14 - i))) as u8;
+                }
+            }
+            return;
+        }
+
         let mut i = 0;
         let mut j = 0;
         let mut w = 0u16;
@@ -770,6 +794,30 @@ pub trait Kem: Params + Expanded + Sample {
     ///
     /// See Algorithm 4 in the [spec](https://frodokem.org/files/FrodoKEM-specification-20210604.pdf).
     fn unpack(&self, input: &[u8], output: &mut [u16]) {
+        if Self::LOG_Q == 16 {
+            debug_assert_eq!(input.len(), output.len() * 2);
+            for (input, out) in input.chunks_exact(2).zip(output.iter_mut()) {
+                *out = u16::from_be_bytes([input[0], input[1]]);
+            }
+            return;
+        }
+
+        if Self::LOG_Q == 15 {
+            debug_assert_eq!(input.len() % 15, 0);
+            debug_assert_eq!(output.len(), (input.len() * 8) / 15);
+
+            for (input, output) in input.chunks_exact(15).zip(output.chunks_exact_mut(8)) {
+                let mut acc = 0u128;
+                for byte in input {
+                    acc = (acc << 8) | u128::from(*byte);
+                }
+                for (i, out) in output.iter_mut().enumerate() {
+                    *out = ((acc >> (15 * (7 - i))) as u16) & Self::Q_MASK;
+                }
+            }
+            return;
+        }
+
         let mut i = 0;
         let mut j = 0;
         let mut w = 0u8;
