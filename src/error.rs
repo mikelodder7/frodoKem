@@ -25,6 +25,9 @@ pub enum Error {
     /// The salt length is invalid
     #[error("Invalid salt length: {0}")]
     InvalidSaltLength(usize),
+    /// The key-generation seed length is invalid
+    #[error("Invalid key-generation seed length: {0}")]
+    InvalidSeedLength(usize),
     /// A key or ciphertext belongs to a different algorithm
     #[error("Algorithm mismatch")]
     AlgorithmMismatch,

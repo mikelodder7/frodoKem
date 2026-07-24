@@ -941,6 +941,7 @@ impl Algorithm {
             shared_secret_length: B::SHARED_SECRET_LENGTH,
             message_length: B::BYTES_MU,
             salt_length: B::BYTES_SALT,
+            key_seed_length: B::KEY_SEED_SIZE,
             encryption_key_length: B::PUBLIC_KEY_LENGTH,
             decryption_key_length: B::SECRET_KEY_LENGTH,
             ciphertext_length: B::CIPHERTEXT_LENGTH,
@@ -1375,6 +1376,83 @@ impl Algorithm {
         )
     }
 
+    /// Deterministically generate a keypair from seed material.
+    ///
+    /// The seed must contain exactly [`AlgorithmParams::key_seed_length`] bytes.
+    /// An internal copy of the seed is zeroized after key generation.
+    pub fn generate_keypair_from_seed<S: AsRef<[u8]>>(
+        &self,
+        seed: S,
+    ) -> FrodoResult<(EncryptionKey, DecryptionKey)> {
+        let seed = seed.as_ref();
+        if seed.len() != self.params().key_seed_length {
+            return Err(Error::InvalidSeedLength(seed.len()));
+        }
+
+        Ok(match self {
+            #[cfg(feature = "frodo640aes")]
+            Self::FrodoKem640Aes => self.inner_generate_keypair_from_seed::<FrodoKem640Aes>(seed),
+            #[cfg(feature = "frodo976aes")]
+            Self::FrodoKem976Aes => self.inner_generate_keypair_from_seed::<FrodoKem976Aes>(seed),
+            #[cfg(feature = "frodo1344aes")]
+            Self::FrodoKem1344Aes => self.inner_generate_keypair_from_seed::<FrodoKem1344Aes>(seed),
+            #[cfg(feature = "frodo640shake")]
+            Self::FrodoKem640Shake => {
+                self.inner_generate_keypair_from_seed::<FrodoKem640Shake>(seed)
+            }
+            #[cfg(feature = "frodo976shake")]
+            Self::FrodoKem976Shake => {
+                self.inner_generate_keypair_from_seed::<FrodoKem976Shake>(seed)
+            }
+            #[cfg(feature = "frodo1344shake")]
+            Self::FrodoKem1344Shake => {
+                self.inner_generate_keypair_from_seed::<FrodoKem1344Shake>(seed)
+            }
+            #[cfg(feature = "efrodo640aes")]
+            Self::EphemeralFrodoKem640Aes => {
+                self.inner_generate_keypair_from_seed::<EphemeralFrodoKem640Aes>(seed)
+            }
+            #[cfg(feature = "efrodo976aes")]
+            Self::EphemeralFrodoKem976Aes => {
+                self.inner_generate_keypair_from_seed::<EphemeralFrodoKem976Aes>(seed)
+            }
+            #[cfg(feature = "efrodo1344aes")]
+            Self::EphemeralFrodoKem1344Aes => {
+                self.inner_generate_keypair_from_seed::<EphemeralFrodoKem1344Aes>(seed)
+            }
+            #[cfg(feature = "efrodo640shake")]
+            Self::EphemeralFrodoKem640Shake => {
+                self.inner_generate_keypair_from_seed::<EphemeralFrodoKem640Shake>(seed)
+            }
+            #[cfg(feature = "efrodo976shake")]
+            Self::EphemeralFrodoKem976Shake => {
+                self.inner_generate_keypair_from_seed::<EphemeralFrodoKem976Shake>(seed)
+            }
+            #[cfg(feature = "efrodo1344shake")]
+            Self::EphemeralFrodoKem1344Shake => {
+                self.inner_generate_keypair_from_seed::<EphemeralFrodoKem1344Shake>(seed)
+            }
+        })
+    }
+
+    fn inner_generate_keypair_from_seed<K: Kem>(
+        &self,
+        seed: &[u8],
+    ) -> (EncryptionKey, DecryptionKey) {
+        let mut seed = seed.to_vec();
+        let (pk, sk) = K::default().generate_keypair_from_seed(&mut seed);
+        (
+            EncryptionKey {
+                algorithm: *self,
+                value: pk.0,
+            },
+            DecryptionKey {
+                algorithm: *self,
+                value: sk.into_vec(),
+            },
+        )
+    }
+
     /// Encapsulate with given message to generate a [`SharedSecret`] and a [`Ciphertext`].
     ///
     /// NOTE: The message and salt must be of the correct length for the algorithm.
@@ -1655,6 +1733,8 @@ pub struct AlgorithmParams {
     pub message_length: usize,
     /// The byte length of the salt
     pub salt_length: usize,
+    /// The byte length of the seed used for deterministic key generation
+    pub key_seed_length: usize,
     /// The byte length of the encryption key
     pub encryption_key_length: usize,
     /// The byte length of the decryption key
@@ -1769,6 +1849,30 @@ mod tests {
             decryption_key.decapsulate::<&[u8]>(&ciphertext).unwrap().0,
             shared_secret
         );
+    }
+
+    #[test]
+    fn deterministic_key_generation_validates_seed_length() {
+        for &algorithm in Algorithm::enabled_algorithms() {
+            let seed = vec![0xA5; algorithm.params().key_seed_length];
+            let first = algorithm.generate_keypair_from_seed(&seed).unwrap();
+            let second = algorithm.generate_keypair_from_seed(&seed).unwrap();
+
+            assert_eq!(first, second);
+            assert!(
+                algorithm
+                    .generate_keypair_from_seed(&seed[..seed.len() - 1])
+                    .is_err()
+            );
+
+            let mut oversized_seed = seed;
+            oversized_seed.push(0);
+            assert!(
+                algorithm
+                    .generate_keypair_from_seed(oversized_seed)
+                    .is_err()
+            );
+        }
     }
 
     #[rstest]

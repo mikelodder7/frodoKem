@@ -77,6 +77,12 @@ FrodoKEM unless that usage restriction is enforced by the application.
 
 When in doubt use the FrodoKEM algorithm variants.
 
+Keypairs can also be generated deterministically with
+`Algorithm::generate_keypair_from_seed`. The required seed length is exposed as
+`Algorithm::params().key_seed_length`; inputs of any other length return an
+error. Callers remain responsible for generating and protecting seed material
+with the same care as a secret key.
+
 ## Expanding matrix A
 
 ### NOTE on AES
