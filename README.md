@@ -5,6 +5,7 @@
 ![Apache2/MIT licensed][license-image]
 [![Downloads][downloads-image]][crate-link]
 ![build](https://github.com/mikelodder7/frodoKem/actions/workflows/frodo-kem.yml/badge.svg)
+[![codecov](https://codecov.io/gh/mikelodder7/frodoKem/branch/main/graph/badge.svg)](https://codecov.io/gh/mikelodder7/frodoKem)
 ![MSRV][msrv-image]
 
 A pure rust implementation of 

@@ -6,9 +6,9 @@ use crate::hazmat::{
     Ciphertext, CiphertextRef, DecryptionKey, DecryptionKeyRef, EncryptionKey, EncryptionKeyRef,
     SharedSecret,
 };
+use ctutils::{Choice, CtEq, CtSelect};
 use rand_core::CryptoRng;
 use shake::digest::{ExtendableOutput, ExtendableOutputReset, Update};
-use subtle::{Choice, ConditionallySelectable};
 use zeroize::Zeroize;
 
 /// Trait for implementing the FrodoKEM sampling algorithm
@@ -320,13 +320,44 @@ pub trait Kem: Params + Expanded + Sample {
         secret_key: S,
         ciphertext: C,
     ) -> (SharedSecret<Self>, Vec<u8>) {
+        self.decapsulate_inner(secret_key, ciphertext, true)
+    }
+
+    /// Decapsulate a ciphertext when only the shared secret is needed.
+    ///
+    /// This avoids allocating and copying the recovered message.
+    fn decapsulate_shared_secret<
+        'a,
+        'b,
+        S: Into<DecryptionKeyRef<'a, Self>>,
+        C: Into<CiphertextRef<'b, Self>>,
+    >(
+        &self,
+        secret_key: S,
+        ciphertext: C,
+    ) -> SharedSecret<Self> {
+        self.decapsulate_inner(secret_key, ciphertext, false).0
+    }
+
+    /// Internal decapsulation implementation with optional message recovery.
+    #[doc(hidden)]
+    fn decapsulate_inner<
+        'a,
+        'b,
+        S: Into<DecryptionKeyRef<'a, Self>>,
+        C: Into<CiphertextRef<'b, Self>>,
+    >(
+        &self,
+        secret_key: S,
+        ciphertext: C,
+        recover_message: bool,
+    ) -> (SharedSecret<Self>, Vec<u8>) {
         let secret_key = secret_key.into();
         let ciphertext = ciphertext.into();
 
         let mut ss = SharedSecret::default();
         let mut matrix_s = vec![0u16; Self::N_X_N_BAR];
-        let pk = EncryptionKeyRef::<Self>::from_slice(secret_key.public_key())
-            .expect("Invalid public key");
+        let pk = EncryptionKeyRef::<Self>::from_validated_slice(secret_key.public_key());
 
         for (i, b) in matrix_s.iter_mut().enumerate() {
             let bb = [
@@ -424,7 +455,12 @@ pub trait Kem: Params + Expanded + Sample {
 
         shake.update(&fin_k);
         shake.finalize_xof_into(&mut ss.0);
-        let mu_prime = g2_in[Self::BYTES_PK_HASH..Self::BYTES_PK_HASH + Self::BYTES_MU].to_vec();
+        fin_k.zeroize();
+        let mu_prime = if recover_message {
+            g2_in[Self::BYTES_PK_HASH..Self::BYTES_PK_HASH + Self::BYTES_MU].to_vec()
+        } else {
+            Vec::new()
+        };
 
         matrix_s.zeroize();
         matrix_w.zeroize();
@@ -866,21 +902,58 @@ pub trait Kem: Params + Expanded + Sample {
 
     /// Constant time verify for a u16 array
     fn ct_verify(&self, a: &[u16], b: &[u16]) -> Choice {
-        let mut choice = 0;
-
-        for i in 0..a.len() {
-            choice |= a[i] ^ b[i];
-        }
-
-        let mut choice = choice as i16;
-        choice = ((choice | choice.wrapping_neg()) >> 15) + 1;
-        Choice::from(choice as u8)
+        a.ct_eq(b)
     }
 
     /// Constant time select for a u16 array
     fn ct_select(&self, choice: Choice, a: &[u8], b: &[u8], out: &mut [u8]) {
         for i in 0..a.len() {
-            out[i] = u8::conditional_select(&b[i], &a[i], choice);
+            out[i] = b[i].ct_select(&a[i], choice);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[derive(Default)]
+    struct GenericPacking;
+
+    impl Params for GenericPacking {
+        type Shake = shake::Shake128;
+
+        const CDF_TABLE: &'static [u16] = &[];
+        const CLAIMED_NIST_LEVEL: usize = 0;
+        const EXTRACTED_BITS: usize = 2;
+        const LOG_Q: usize = 14;
+        const N: usize = 8;
+        const SHARED_SECRET_LENGTH: usize = 16;
+    }
+
+    impl Expanded for GenericPacking {
+        const METHOD: &'static str = "test";
+
+        fn expand_a(&self, _seed_a: &[u8], _a: &mut [u16]) {}
+    }
+
+    impl Sample for GenericPacking {
+        fn sample(&self, _s: &mut [u16]) {}
+    }
+
+    impl Kem for GenericPacking {
+        const NAME: &'static str = "test";
+    }
+
+    #[test]
+    fn generic_pack_and_unpack_round_trip() {
+        let input = [0, 1, 0x123, 0x2345, 0x3FFF, 7, 42, 9000];
+        let mut packed = [0; 14];
+        let mut unpacked = [0; 8];
+
+        GenericPacking.pack(&input, &mut packed);
+        GenericPacking.unpack(&packed, &mut unpacked);
+
+        assert_eq!(unpacked, input);
     }
 }

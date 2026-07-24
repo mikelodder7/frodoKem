@@ -4,6 +4,7 @@
 */
 use super::{Expanded, Kem, Params, Sample};
 use crate::{Error, FrodoResult};
+use ctutils::CtEq;
 use std::marker::PhantomData;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
@@ -89,6 +90,11 @@ from_slice_impl!(Ciphertext);
 serde_impl!(Ciphertext);
 
 impl<P: Params> Ciphertext<P> {
+    /// Consume this ciphertext and return its serialized bytes.
+    pub(crate) fn into_vec(self) -> Vec<u8> {
+        self.0
+    }
+
     /// Convert a slice of bytes into a ciphertext
     pub fn from_slice(bytes: &[u8]) -> FrodoResult<Self> {
         if bytes.len() != P::CIPHERTEXT_LENGTH {
@@ -148,6 +154,11 @@ impl<'a, P: Params> From<&'a Ciphertext<P>> for CiphertextRef<'a, P> {
 }
 
 impl<'a, P: Params> CiphertextRef<'a, P> {
+    /// Create a ciphertext reference from bytes whose length was validated by its type.
+    pub(crate) fn from_validated_slice(bytes: &'a [u8]) -> Self {
+        Self(bytes, PhantomData)
+    }
+
     /// Create a ciphertext reference
     #[allow(dead_code)]
     pub fn from_slice(bytes: &'a [u8]) -> FrodoResult<Self> {
@@ -253,6 +264,11 @@ impl<P: Params> AsRef<[u8]> for EncryptionKeyRef<'_, P> {
 }
 
 impl<'a, P: Params> EncryptionKeyRef<'a, P> {
+    /// Create a public-key reference from bytes whose length was already validated.
+    pub(crate) fn from_validated_slice(bytes: &'a [u8]) -> Self {
+        Self(bytes, PhantomData)
+    }
+
     /// Create a public key reference
     pub fn from_slice(bytes: &'a [u8]) -> FrodoResult<Self> {
         if bytes.len() != P::PUBLIC_KEY_LENGTH {
@@ -279,8 +295,28 @@ impl<'a, P: Params> EncryptionKeyRef<'a, P> {
 }
 
 /// A FrodoKEM secret key
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone)]
 pub struct DecryptionKey<P: Params>(pub(crate) Vec<u8>, pub(crate) PhantomData<P>);
+
+impl<P: Params> std::fmt::Debug for DecryptionKey<P> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DecryptionKey").finish_non_exhaustive()
+    }
+}
+
+impl<P: Params> CtEq for DecryptionKey<P> {
+    fn ct_eq(&self, other: &Self) -> ctutils::Choice {
+        self.0.ct_eq(&other.0)
+    }
+}
+
+impl<P: Params> Eq for DecryptionKey<P> {}
+
+impl<P: Params> PartialEq for DecryptionKey<P> {
+    fn eq(&self, other: &Self) -> bool {
+        bool::from(self.ct_eq(other))
+    }
+}
 
 impl<P: Params> AsRef<[u8]> for DecryptionKey<P> {
     fn as_ref(&self) -> &[u8] {
@@ -302,11 +338,22 @@ impl<P: Params> Zeroize for DecryptionKey<P> {
 
 impl<P: Params> ZeroizeOnDrop for DecryptionKey<P> {}
 
+impl<P: Params> Drop for DecryptionKey<P> {
+    fn drop(&mut self) {
+        self.zeroize();
+    }
+}
+
 from_slice_impl!(DecryptionKey);
 
 serde_impl!(DecryptionKey);
 
 impl<P: Params> DecryptionKey<P> {
+    /// Consume this key and return its serialized bytes.
+    pub(crate) fn into_vec(mut self) -> Vec<u8> {
+        std::mem::take(&mut self.0)
+    }
+
     /// Convert a slice of bytes into a secret key
     pub fn from_slice(bytes: &[u8]) -> FrodoResult<Self> {
         if bytes.len() != P::SECRET_KEY_LENGTH {
@@ -416,8 +463,28 @@ impl<'a, P: Params> DecryptionKeyRef<'a, P> {
 }
 
 /// A FrodoKEM shared secret
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone)]
 pub struct SharedSecret<P: Params>(pub(crate) Vec<u8>, pub(crate) PhantomData<P>);
+
+impl<P: Params> std::fmt::Debug for SharedSecret<P> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SharedSecret").finish_non_exhaustive()
+    }
+}
+
+impl<P: Params> CtEq for SharedSecret<P> {
+    fn ct_eq(&self, other: &Self) -> ctutils::Choice {
+        self.0.ct_eq(&other.0)
+    }
+}
+
+impl<P: Params> Eq for SharedSecret<P> {}
+
+impl<P: Params> PartialEq for SharedSecret<P> {
+    fn eq(&self, other: &Self) -> bool {
+        bool::from(self.ct_eq(other))
+    }
+}
 
 impl<P: Params> AsRef<[u8]> for SharedSecret<P> {
     fn as_ref(&self) -> &[u8] {
@@ -439,11 +506,22 @@ impl<P: Params> Zeroize for SharedSecret<P> {
 
 impl<P: Params> ZeroizeOnDrop for SharedSecret<P> {}
 
+impl<P: Params> Drop for SharedSecret<P> {
+    fn drop(&mut self) {
+        self.zeroize();
+    }
+}
+
 from_slice_impl!(SharedSecret);
 
 serde_impl!(SharedSecret);
 
 impl<P: Params> SharedSecret<P> {
+    /// Consume this shared secret and return its bytes.
+    pub(crate) fn into_vec(mut self) -> Vec<u8> {
+        std::mem::take(&mut self.0)
+    }
+
     /// Convert a slice of bytes into a shared secret
     pub fn from_slice(bytes: &[u8]) -> FrodoResult<Self> {
         if bytes.len() != P::SHARED_SECRET_LENGTH {
@@ -1129,5 +1207,122 @@ impl<P: Params> Sample for FrodoCdfSample<P> {
 
             *s_i = (sign.wrapping_neg() ^ sample).wrapping_add(sign);
         }
+    }
+}
+
+#[cfg(all(test, feature = "frodo640shake", feature = "serde"))]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use super::*;
+    use crate::hazmat::FrodoKem640Shake;
+
+    type P = FrodoKem640Shake;
+
+    #[test]
+    fn model_components_and_references_round_trip() {
+        let mut ciphertext = Ciphertext::<P>::default();
+        ciphertext.c1_mut().fill(1);
+        ciphertext.c2_mut().fill(2);
+        ciphertext.salt_mut().fill(3);
+        let ciphertext_ref = CiphertextRef::<P>::from_slice(ciphertext.as_ref()).unwrap();
+        assert_eq!(ciphertext_ref.as_ref(), ciphertext.as_ref());
+        assert_eq!(ciphertext_ref.c1(), ciphertext.c1());
+        assert_eq!(ciphertext_ref.c2(), ciphertext.c2());
+        assert_eq!(ciphertext_ref.salt(), ciphertext.salt());
+        assert_eq!(ciphertext_ref.to_owned(), ciphertext);
+        assert!(CiphertextRef::<P>::from_slice(&[]).is_err());
+
+        let mut encryption_key = EncryptionKey::<P>::default();
+        encryption_key.seed_a_mut().fill(4);
+        encryption_key.matrix_b_mut().fill(5);
+        let encryption_key_ref =
+            EncryptionKeyRef::<P>::from_slice(encryption_key.as_ref()).unwrap();
+        assert_eq!(encryption_key_ref.as_ref(), encryption_key.as_ref());
+        assert_eq!(encryption_key_ref.seed_a(), encryption_key.seed_a());
+        assert_eq!(encryption_key_ref.matrix_b(), encryption_key.matrix_b());
+        assert_eq!(encryption_key_ref.to_owned(), encryption_key);
+        assert!(EncryptionKeyRef::<P>::from_slice(&[]).is_err());
+
+        let mut decryption_key = DecryptionKey::<P>::default();
+        decryption_key.random_s_mut().fill(6);
+        decryption_key.public_key_mut().fill(7);
+        decryption_key.matrix_s_mut().fill(8);
+        decryption_key.hpk_mut().fill(9);
+        let decryption_key_ref =
+            DecryptionKeyRef::<P>::from_slice(decryption_key.as_ref()).unwrap();
+        assert_eq!(decryption_key_ref.as_ref(), decryption_key.as_ref());
+        assert_eq!(decryption_key_ref.random_s(), decryption_key.random_s());
+        assert_eq!(decryption_key_ref.public_key(), decryption_key.public_key());
+        assert_eq!(decryption_key_ref.matrix_s(), decryption_key.matrix_s());
+        assert_eq!(decryption_key_ref.hpk(), decryption_key.hpk());
+        assert_eq!(decryption_key_ref.to_owned(), decryption_key);
+        assert!(DecryptionKeyRef::<P>::from_slice(&[]).is_err());
+
+        let shared_secret = SharedSecret::<P>::default();
+        let shared_secret_ref = SharedSecretRef::<P>::from_slice(shared_secret.as_ref()).unwrap();
+        assert_eq!(shared_secret_ref.as_ref(), shared_secret.as_ref());
+        assert_eq!(SharedSecretRef::from(&shared_secret), shared_secret_ref);
+        assert_eq!(shared_secret_ref.to_owned(), shared_secret);
+        assert!(SharedSecretRef::<P>::from_slice(&[]).is_err());
+    }
+
+    #[test]
+    fn owned_model_conversions_are_complete() {
+        macro_rules! check_conversions {
+            ($type:ident, $bytes:expr) => {{
+                let bytes = $bytes;
+                assert_eq!(
+                    $type::<P>::try_from(bytes.as_slice()).unwrap().as_ref(),
+                    bytes
+                );
+                assert_eq!($type::<P>::try_from(bytes.clone()).unwrap().as_ref(), bytes);
+                assert_eq!($type::<P>::try_from(&bytes).unwrap().as_ref(), bytes);
+                assert_eq!(
+                    $type::<P>::try_from(bytes.clone().into_boxed_slice())
+                        .unwrap()
+                        .as_ref(),
+                    bytes
+                );
+            }};
+        }
+
+        check_conversions!(Ciphertext, vec![1; P::CIPHERTEXT_LENGTH]);
+        check_conversions!(EncryptionKey, vec![2; P::PUBLIC_KEY_LENGTH]);
+        check_conversions!(DecryptionKey, vec![3; P::SECRET_KEY_LENGTH]);
+        check_conversions!(SharedSecret, vec![4; P::SHARED_SECRET_LENGTH]);
+    }
+
+    #[test]
+    fn model_serialization_round_trips_and_rejects_bad_lengths() {
+        macro_rules! check_serialization {
+            ($type:ident) => {{
+                let value = $type::<P>::default();
+                let json = serde_json::to_string(&value).unwrap();
+                assert_eq!(serde_json::from_str::<$type<P>>(&json).unwrap(), value);
+                let bytes = postcard::to_stdvec(&value).unwrap();
+                assert_eq!(postcard::from_bytes::<$type<P>>(&bytes).unwrap(), value);
+                assert!(serde_json::from_str::<$type<P>>("\"00\"").is_err());
+            }};
+        }
+
+        check_serialization!(Ciphertext);
+        check_serialization!(EncryptionKey);
+        check_serialization!(DecryptionKey);
+        check_serialization!(SharedSecret);
+    }
+
+    #[test]
+    fn secret_models_redact_debug_and_zeroize() {
+        let mut decryption_key =
+            DecryptionKey::<P>::from_slice(&vec![0xA5; P::SECRET_KEY_LENGTH]).unwrap();
+        let mut shared_secret =
+            SharedSecret::<P>::from_slice(&[0x5A; P::SHARED_SECRET_LENGTH]).unwrap();
+
+        assert_eq!(format!("{decryption_key:?}"), "DecryptionKey { .. }");
+        assert_eq!(format!("{shared_secret:?}"), "SharedSecret { .. }");
+        decryption_key.zeroize();
+        shared_secret.zeroize();
+        assert!(decryption_key.as_ref().iter().all(|byte| *byte == 0));
+        assert!(shared_secret.as_ref().iter().all(|byte| *byte == 0));
     }
 }
