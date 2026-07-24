@@ -22,6 +22,12 @@ pub enum Error {
     /// The message length is invalid
     #[error("Invalid message length: {0}")]
     InvalidMessageLength(usize),
+    /// The salt length is invalid
+    #[error("Invalid salt length: {0}")]
+    InvalidSaltLength(usize),
+    /// A key or ciphertext belongs to a different algorithm
+    #[error("Algorithm mismatch")]
+    AlgorithmMismatch,
     /// Parsing string to algorithm
     #[error("Unsupported algorithm")]
     UnsupportedAlgorithm,
