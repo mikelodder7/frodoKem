@@ -64,7 +64,6 @@
 //! To create a custom implementation of FrodoKEM, use the `hazmat` feature, to access
 //! the necessary traits and models for creating a custom implementation.
 //! Be warned, this is not recommended unless you are sure of what you are doing.
-#![cfg_attr(docsrs, feature(doc_auto_cfg))]
 #![warn(
     missing_docs,
     missing_debug_implementations,
