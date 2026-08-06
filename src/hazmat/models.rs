@@ -612,6 +612,10 @@ impl<P: Params, E: Expanded, S: Sample> Expanded for FrodoKem<P, E, S> {
     fn expand_a(&self, seed_a: &[u8], a: &mut [u16]) {
         E::expand_a(&E::default(), seed_a, a)
     }
+
+    fn expand_a_rows(&self, seed_a: &[u8], n: usize, f: &mut dyn FnMut(usize, &[u16])) {
+        E::expand_a_rows(&E::default(), seed_a, n, f)
+    }
 }
 
 #[cfg(any(
@@ -687,6 +691,10 @@ impl<P: Params, E: Expanded, S: Sample> Expanded for EphemeralFrodoKem<P, E, S> 
 
     fn expand_a(&self, seed_a: &[u8], a: &mut [u16]) {
         E::expand_a(&E::default(), seed_a, a)
+    }
+
+    fn expand_a_rows(&self, seed_a: &[u8], n: usize, f: &mut dyn FnMut(usize, &[u16])) {
+        E::expand_a_rows(&E::default(), seed_a, n, f)
     }
 }
 
@@ -911,7 +919,7 @@ impl Params for EphemeralFrodo1344 {
     feature = "efrodo1344aes",
     feature = "frodo1344aes",
 ))]
-/// Generate matrix A (N x N) column-wise using AES-128
+/// Generate matrix A (N x N) row-wise using AES-128
 ///
 /// See Algorithm 7 in the [spec](https://frodokem.org/files/FrodoKEM-specification-20190215.pdf)
 #[derive(Copy, Clone, Default, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -983,8 +991,63 @@ impl<P: Params> Expanded for FrodoAes<P> {
         #[cfg(target_endian = "big")]
         {
             for i in a.iter_mut() {
-                *i = i.to_be();
+                *i = i.swap_bytes();
             }
+        }
+    }
+
+    fn expand_a_rows(&self, seed_a: &[u8], n: usize, f: &mut dyn FnMut(usize, &[u16])) {
+        use aes::{
+            Aes128Enc, Block,
+            cipher::{BlockCipherEncrypt, KeyInit, KeySizeUser},
+        };
+
+        debug_assert_eq!(n, P::N);
+        debug_assert_eq!(seed_a.len(), P::BYTES_SEED_A);
+        debug_assert_eq!(seed_a.len(), <Aes128Enc as KeySizeUser>::key_size());
+        let enc = Aes128Enc::new_from_slice(seed_a).expect("a valid key size of 16 bytes");
+
+        // 64 rows keeps the buffer small (e.g. ~168KB for N=1344 vs ~3.6MB for
+        // the full matrix) while batching enough blocks per `encrypt_blocks`
+        // call to amortize its per-call setup cost.
+        const BLOCK_ROWS: usize = 64;
+        let mut rows = vec![0u16; BLOCK_ROWS.min(n) * n];
+        for i0 in (0..n).step_by(BLOCK_ROWS) {
+            let nrows = BLOCK_ROWS.min(n - i0);
+            let chunk = &mut rows[..nrows * n];
+            // Treat the row chunk as blocks then overwrite in place to avoid allocation
+            // SAFETY: `chunk` is a valid `&mut [u16]` whose byte length
+            // (`2 * nrows * n`) is an exact multiple of the 16-byte AES block
+            // size, and `Block` (a byte array) has no stricter alignment than
+            // u16. The blocks are encrypted in place and read back as
+            // little-endian u16 values.
+            let blocks = unsafe {
+                std::slice::from_raw_parts_mut(
+                    chunk.as_mut_ptr() as *mut Block,
+                    nrows * n / P::STRIPE_STEP,
+                )
+            };
+            let mut pos = 0;
+            for r in 0..nrows {
+                let ii = (i0 + r) as u16;
+                let mut block = Block::default();
+                block[..2].copy_from_slice(&ii.to_le_bytes());
+                for j in (0..n).step_by(P::STRIPE_STEP) {
+                    let jj = j as u16;
+                    block[2..4].copy_from_slice(&jj.to_le_bytes());
+                    blocks[pos] = block;
+                    pos += 1;
+                }
+            }
+
+            enc.encrypt_blocks(blocks);
+            #[cfg(target_endian = "big")]
+            {
+                for i in chunk.iter_mut() {
+                    *i = i.swap_bytes();
+                }
+            }
+            f(i0, chunk);
         }
     }
 }
@@ -1053,8 +1116,77 @@ impl<P: Params> Expanded for FrodoAes<P> {
         #[cfg(target_endian = "big")]
         {
             for i in a.iter_mut() {
-                *i = i.to_be();
+                *i = i.swap_bytes();
             }
+        }
+    }
+
+    fn expand_a_rows(&self, seed_a: &[u8], n: usize, f: &mut dyn FnMut(usize, &[u16])) {
+        debug_assert_eq!(n, P::N);
+        debug_assert_eq!(seed_a.len(), P::BYTES_SEED_A);
+        debug_assert_eq!(seed_a.len(), 16);
+
+        // 64 rows keeps the buffer small while batching enough blocks per
+        // `EVP_EncryptUpdate` call to amortize its per-call overhead.
+        const BLOCK_ROWS: usize = 64;
+        let mut rows = vec![0u16; BLOCK_ROWS.min(n) * n];
+        unsafe {
+            let aes_key_schedule = openssl_sys::EVP_CIPHER_CTX_new();
+            if aes_key_schedule.is_null() {
+                panic!("EVP_CIPHER_CTX_new failed");
+            }
+            if openssl_sys::EVP_EncryptInit_ex(
+                aes_key_schedule,
+                openssl_sys::EVP_aes_128_ecb(),
+                std::ptr::null_mut(),
+                seed_a.as_ptr(),
+                std::ptr::null_mut(),
+            ) != 1
+            {
+                panic!("EVP_EncryptInit_ex failed");
+            }
+            for i0 in (0..n).step_by(BLOCK_ROWS) {
+                let nrows = BLOCK_ROWS.min(n - i0);
+                let chunk = &mut rows[..nrows * n];
+                // SAFETY: `chunk` is a valid `&mut [u16]`; reinterpreting it as
+                // `2 * len` bytes stays in bounds and u8 has no alignment
+                // requirement. The bytes are encrypted in place and read back
+                // as little-endian u16 values.
+                let in_blocks =
+                    std::slice::from_raw_parts_mut(chunk.as_mut_ptr() as *mut u8, nrows * n * 2);
+                let mut in_block = [0u8; 16];
+                let mut pos = 0;
+                for r in 0..nrows {
+                    let ii = (i0 + r) as u16;
+                    in_block[..2].copy_from_slice(&ii.to_le_bytes());
+                    for j in (0..n).step_by(P::STRIPE_STEP) {
+                        let jj = j as u16;
+                        in_block[2..4].copy_from_slice(&jj.to_le_bytes());
+                        in_blocks[pos..pos + 16].copy_from_slice(&in_block);
+                        pos += 16;
+                    }
+                }
+                let mut olen = in_blocks.len() as i32;
+                let ilen = in_blocks.len() as i32;
+                if openssl_sys::EVP_EncryptUpdate(
+                    aes_key_schedule,
+                    in_blocks.as_mut_ptr(),
+                    &mut olen,
+                    in_blocks.as_ptr(),
+                    ilen,
+                ) != 1
+                {
+                    panic!("EVP_EncryptUpdate failed");
+                }
+                #[cfg(target_endian = "big")]
+                {
+                    for i in chunk.iter_mut() {
+                        *i = i.swap_bytes();
+                    }
+                }
+                f(i0, chunk);
+            }
+            openssl_sys::EVP_CIPHER_CTX_free(aes_key_schedule);
         }
     }
 }
@@ -1067,7 +1199,7 @@ impl<P: Params> Expanded for FrodoAes<P> {
     feature = "efrodo1344shake",
     feature = "frodo1344shake",
 ))]
-/// Generate matrix A (N x N) column-wise using SHAKE-128
+/// Generate matrix A (N x N) row-wise using SHAKE-128
 ///
 /// See Algorithm 8 in the [spec](https://frodokem.org/files/FrodoKEM-specification-20190215.pdf)
 #[derive(Copy, Clone, Default, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -1115,9 +1247,45 @@ impl<P: Params> Expanded for FrodoShake<P> {
             #[cfg(target_endian = "big")]
             {
                 for i in a_temp {
-                    *i = i.to_be();
+                    *i = i.swap_bytes();
                 }
             }
+        }
+    }
+
+    fn expand_a_rows(&self, seed_a: &[u8], n: usize, f: &mut dyn FnMut(usize, &[u16])) {
+        use shake::{
+            Shake128,
+            digest::{ExtendableOutputReset, Update},
+        };
+
+        debug_assert_eq!(n, P::N);
+        debug_assert_eq!(seed_a.len(), P::BYTES_SEED_A);
+
+        let mut seed_separated = vec![0u8; P::TWO_PLUS_BYTES_SEED_A];
+        let mut shake = Shake128::default();
+
+        seed_separated[2..].copy_from_slice(seed_a);
+
+        let mut row = vec![0u16; n];
+        for i in 0..n {
+            seed_separated[0..2].copy_from_slice(&(i as u16).to_le_bytes());
+            shake.update(&seed_separated);
+            // SAFETY: `row` is a valid `&mut [u16]` of length `n`; reinterpreting
+            // it as `2 * n` bytes stays in bounds and u8 has no alignment
+            // requirement. The u16 values are rebuilt from the written bytes
+            // (little-endian) before use.
+            let bytes = unsafe {
+                std::slice::from_raw_parts_mut(row.as_mut_ptr() as *mut u8, row.len() * 2)
+            };
+            shake.finalize_xof_reset_into(bytes);
+            #[cfg(target_endian = "big")]
+            {
+                for i in row.iter_mut() {
+                    *i = i.swap_bytes();
+                }
+            }
+            f(i, &row);
         }
     }
 }
@@ -1183,8 +1351,63 @@ impl<P: Params> Expanded for FrodoShake<P> {
         #[cfg(target_endian = "big")]
         {
             for i in a.iter_mut() {
-                *i = i.to_be();
+                *i = i.swap_bytes();
             }
+        }
+    }
+
+    fn expand_a_rows(&self, seed_a: &[u8], n: usize, f: &mut dyn FnMut(usize, &[u16])) {
+        debug_assert_eq!(n, P::N);
+        debug_assert_eq!(seed_a.len(), P::BYTES_SEED_A);
+
+        let mut seed_separated = vec![0u8; P::TWO_PLUS_BYTES_SEED_A];
+        seed_separated[2..].copy_from_slice(seed_a);
+
+        let mut row = vec![0u16; n];
+        for i in 0..n {
+            seed_separated[0..2].copy_from_slice(&(i as u16).to_le_bytes());
+            unsafe {
+                let shake = openssl_sys::EVP_MD_CTX_new();
+                if shake.is_null() {
+                    panic!("EVP_MD_CTX_new failed");
+                }
+                if openssl_sys::EVP_DigestInit_ex(
+                    shake,
+                    openssl_sys::EVP_shake128(),
+                    std::ptr::null_mut(),
+                ) != 1
+                {
+                    panic!("EVP_DigestInit_ex failed");
+                }
+                if openssl_sys::EVP_DigestUpdate(
+                    shake,
+                    seed_separated.as_ptr() as *const _,
+                    seed_separated.len(),
+                ) != 1
+                {
+                    panic!("EVP_DigestUpdate failed");
+                }
+                // SAFETY: `row` is a valid `&mut [u16]`; the write length is
+                // derived from `row.len()` so writing `2 * row.len()` bytes
+                // through its pointer stays in bounds and the values are read
+                // back as little-endian u16.
+                if openssl_sys::EVP_DigestFinalXOF(
+                    shake,
+                    row.as_mut_ptr() as *mut u8,
+                    row.len() * 2,
+                ) != 1
+                {
+                    panic!("EVP_DigestFinalXOF failed");
+                }
+                openssl_sys::EVP_MD_CTX_free(shake);
+            }
+            #[cfg(target_endian = "big")]
+            {
+                for i in row.iter_mut() {
+                    *i = i.swap_bytes();
+                }
+            }
+            f(i, &row);
         }
     }
 }

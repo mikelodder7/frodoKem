@@ -20,14 +20,14 @@
 //!
 //! assert_eq!(enc_ss, dec_ss);
 //! ```
-//! If the `message` is known, it can be passed to the `encapsulate`.
+//! If the `message` is known, it can be passed to `encapsulate`.
 //! `encapsulate` will error if the `message` is not the correct size. This method also requires
 //! a `salt` for non-ephemeral algorithms, and the `salt` is considered public information.
 //!
 //! Ephemeral variants are meant to be used one-time only and thus do not require a `salt`.
 //!
 //! ## ☢️️ WARNING: HAZARDOUS ☢️
-//! It is considered unsafe to use Ephemeral algorithms more than once.
+//! It is considered unsafe to use ephemeral algorithms more than once.
 //! For more information, see Clause 14 of
 //! [ISO/IEC 18033-2:2006/Amd 2:2026](https://www.iso.org/standard/86890.html).
 //!
@@ -66,7 +66,7 @@
 //!
 //! ## Custom
 //!
-//! To create a custom implementation of FrodoKEM, use the `hazmat` feature, to access
+//! To create a custom implementation of FrodoKEM, use the `hazmat` feature to access
 //! the necessary traits and models for creating a custom implementation.
 //! Be warned, this is not recommended unless you are sure of what you are doing.
 #![warn(
@@ -245,7 +245,7 @@ macro_rules! ct_eq_imp {
     };
 }
 
-/// A FrodoKEM ciphertext key
+/// A FrodoKEM ciphertext
 #[derive(Debug, Clone, Default)]
 pub struct Ciphertext {
     pub(crate) algorithm: Algorithm,
@@ -315,7 +315,7 @@ impl EncryptionKey {
         self.value.as_slice()
     }
 
-    /// Convert a slice of bytes into a [`EncryptionKey`] according to the specified [`Algorithm`].
+    /// Convert a slice of bytes into an [`EncryptionKey`] according to the specified [`Algorithm`].
     pub fn from_bytes<B: AsRef<[u8]>>(algorithm: Algorithm, value: B) -> FrodoResult<Self> {
         algorithm.encryption_key_from_bytes(value.as_ref())
     }
@@ -332,7 +332,7 @@ impl EncryptionKey {
     ///
     /// NOTE: The message must be of the correct length for the algorithm.
     /// Also, this method is deterministic, meaning that using the same message
-    /// will yield the same [`SharedSecret`] and [`Ciphertext`]
+    /// will yield the same [`SharedSecret`] and [`Ciphertext`].
     pub fn encapsulate<B: AsRef<[u8]>, S: AsRef<[u8]>>(
         &self,
         message: B,
@@ -463,7 +463,7 @@ impl SharedSecret {
     }
 }
 
-/// The supported FrodoKem algorithms
+/// The supported FrodoKEM algorithms
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Ord, PartialOrd, Hash)]
 pub enum Algorithm {
     #[cfg(feature = "frodo640aes")]
@@ -485,22 +485,22 @@ pub enum Algorithm {
     /// The FrodoKEM-1344-SHAKE algorithm
     FrodoKem1344Shake,
     #[cfg(feature = "efrodo640aes")]
-    /// The FrodoKEM-640-AES algorithm
+    /// The eFrodoKEM-640-AES algorithm
     EphemeralFrodoKem640Aes,
     #[cfg(feature = "efrodo976aes")]
-    /// The FrodoKEM-976-AES algorithm
+    /// The eFrodoKEM-976-AES algorithm
     EphemeralFrodoKem976Aes,
     #[cfg(feature = "efrodo1344aes")]
-    /// The FrodoKEM-1344-AES algorithm
+    /// The eFrodoKEM-1344-AES algorithm
     EphemeralFrodoKem1344Aes,
     #[cfg(feature = "efrodo640shake")]
-    /// The FrodoKEM-640-SHAKE algorithm
+    /// The eFrodoKEM-640-SHAKE algorithm
     EphemeralFrodoKem640Shake,
     #[cfg(feature = "efrodo976shake")]
-    /// The FrodoKEM-976-SHAKE algorithm
+    /// The eFrodoKEM-976-SHAKE algorithm
     EphemeralFrodoKem976Shake,
     #[cfg(feature = "efrodo1344shake")]
-    /// The FrodoKEM-1344-SHAKE algorithm
+    /// The eFrodoKEM-1344-SHAKE algorithm
     EphemeralFrodoKem1344Shake,
 }
 
@@ -1317,7 +1317,7 @@ impl Algorithm {
         }
     }
 
-    /// Generate a new keypair consisting of a [`EncryptionKey`] and a [`DecryptionKey`]
+    /// Generate a new keypair consisting of an [`EncryptionKey`] and a [`DecryptionKey`]
     pub fn generate_keypair(&self, rng: impl CryptoRng) -> (EncryptionKey, DecryptionKey) {
         match self {
             #[cfg(feature = "frodo640aes")]
@@ -1457,7 +1457,7 @@ impl Algorithm {
     ///
     /// NOTE: The message and salt must be of the correct length for the algorithm.
     /// Also, this method is deterministic, meaning that using the same message and salt
-    /// will yield the same [`SharedSecret`] and [`Ciphertext`]
+    /// will yield the same [`SharedSecret`] and [`Ciphertext`].
     pub fn encapsulate<B: AsRef<[u8]>, S: AsRef<[u8]>>(
         &self,
         public_key: &EncryptionKey,
@@ -1703,7 +1703,7 @@ impl Algorithm {
     }
 }
 
-/// The algorithm underlying parameters
+/// The algorithm's underlying parameters
 #[derive(Debug, Clone, Copy)]
 pub struct AlgorithmParams {
     /// Number of elements in the ring

@@ -13,8 +13,8 @@ use zeroize::Zeroize;
 
 /// Trait for implementing the FrodoKEM sampling algorithm
 ///
-/// See Algorithm 5 and 6 in the [spec](https://frodokem.org/files/FrodoKEM-specification-20210604.pdf).
-/// or Algorithm 7.4 and 7.5 in [iso](https://frodokem.org/files/FrodoKEM-standard_proposal-20230314.pdf).
+/// See Algorithm 5 and 6 in the [spec](https://frodokem.org/files/FrodoKEM-specification-20210604.pdf)
+/// or Algorithm 7.4 and 7.5 in the [iso](https://frodokem.org/files/FrodoKEM-standard_proposal-20230314.pdf).
 pub trait Sample: Default {
     /// The method used to sample.
     ///
@@ -23,16 +23,30 @@ pub trait Sample: Default {
 }
 
 /// Trait for implementing equivalents to
-/// Algorithm 7 and 8 in the [spec](https://frodokem.org/files/FrodoKEM-specification-20210604.pdf).
-/// or Algorithm 7.6 in [iso](https://frodokem.org/files/FrodoKEM-standard_proposal-20230314.pdf).
+/// Algorithm 7 and 8 in the [spec](https://frodokem.org/files/FrodoKEM-specification-20210604.pdf)
+/// or Algorithm 7.6 in the [iso](https://frodokem.org/files/FrodoKEM-standard_proposal-20230314.pdf).
 ///
 /// Expand the seed to produce the matrix A
 pub trait Expanded: Default {
     /// The method used to expand the seed
     const METHOD: &'static str;
     /// Expand the seed to produce the matrix A
-    /// Generate matrix A (N x N) column-wise
+    /// Generate matrix A (N x N) row-wise
     fn expand_a(&self, seed_a: &[u8], a: &mut [u16]);
+
+    /// Visit the rows of matrix A (`n` x `n`) in order without requiring the
+    /// full matrix to be materialized.
+    ///
+    /// `f` is called with the index of the first row in the block and a slice
+    /// containing one or more whole rows (`rows.len()` is a multiple of `n`).
+    /// Implementations that can derive rows independently override this to
+    /// stream small row blocks, reducing peak memory from `2 * n * n` bytes to
+    /// a few rows; the default falls back to [`Expanded::expand_a`].
+    fn expand_a_rows(&self, seed_a: &[u8], n: usize, f: &mut dyn FnMut(usize, &[u16])) {
+        let mut a = vec![0u16; n * n];
+        self.expand_a(seed_a, &mut a);
+        f(0, &a);
+    }
 }
 
 /// The base FrodoKEM parameters for either eFrodo or Frodo
@@ -108,7 +122,7 @@ pub trait Params: Sized + Default {
 
 /// The base FrodoKEM methods
 pub trait Kem: Params + Expanded + Sample {
-    /// The name of the frodoKEM algorithm
+    /// The name of the FrodoKEM algorithm
     const NAME: &'static str;
 
     /// Generate a keypair
@@ -160,18 +174,15 @@ pub trait Kem: Params + Expanded + Sample {
         #[cfg(target_endian = "big")]
         {
             for b in bytes_se.iter_mut() {
-                *b = b.to_be();
+                *b = b.swap_bytes();
             }
         }
 
         self.sample(&mut bytes_se);
 
-        let mut a_matrix = vec![0u16; Self::N_X_N];
-        self.expand_a(pk.seed_a(), &mut a_matrix);
-
         let mut matrix_b = vec![0u16; Self::N_X_N_BAR];
-        self.mul_add_as_plus_e(
-            &a_matrix,
+        self.mul_add_as_plus_e_from_seed(
+            pk.seed_a(),
             &bytes_se[..Self::N_X_N_BAR],
             &bytes_se[Self::N_X_N_BAR..],
             &mut matrix_b,
@@ -252,7 +263,7 @@ pub trait Kem: Params + Expanded + Sample {
         #[cfg(target_endian = "big")]
         {
             for b in sp.iter_mut() {
-                *b = b.to_be();
+                *b = b.swap_bytes();
             }
         }
 
@@ -262,11 +273,8 @@ pub trait Kem: Params + Expanded + Sample {
         let ep = &sp[Self::N_X_N_BAR..2 * Self::N_X_N_BAR];
         let epp = &sp[2 * Self::N_X_N_BAR..];
 
-        let mut matrix_a = vec![0u16; Self::N_X_N];
-        self.expand_a(public_key.seed_a(), &mut matrix_a);
-
         let mut matrix_b = vec![0u16; Self::N_X_N_BAR];
-        self.mul_add_sa_plus_e(s, &matrix_a, ep, &mut matrix_b);
+        self.mul_add_sa_plus_e_from_seed(public_key.seed_a(), s, ep, &mut matrix_b);
 
         self.pack(&matrix_b, ct.c1_mut());
 
@@ -400,7 +408,7 @@ pub trait Kem: Params + Expanded + Sample {
         #[cfg(target_endian = "big")]
         {
             for b in sp.iter_mut() {
-                *b = b.to_be();
+                *b = b.swap_bytes();
             }
         }
 
@@ -410,11 +418,8 @@ pub trait Kem: Params + Expanded + Sample {
         let ep = &sp[Self::N_X_N_BAR..2 * Self::N_X_N_BAR];
         let epp = &sp[2 * Self::N_X_N_BAR..];
 
-        let mut matrix_a = vec![0u16; Self::N_X_N];
-        self.expand_a(pk.seed_a(), &mut matrix_a);
-
         let mut matrix_bpp = vec![0u16; Self::N_X_N_BAR];
-        self.mul_add_sa_plus_e(s, &matrix_a, ep, &mut matrix_bpp);
+        self.mul_add_sa_plus_e_from_seed(pk.seed_a(), s, ep, &mut matrix_bpp);
         // BB mod q
         matrix_bpp.iter_mut().for_each(|b| *b &= Self::Q_MASK);
 
@@ -519,6 +524,79 @@ pub trait Kem: Params + Expanded + Sample {
             b[i_bar + 6] = b[i_bar + 6].wrapping_add(sum[6]);
             b[i_bar + 7] = b[i_bar + 7].wrapping_add(sum[7]);
         }
+    }
+
+    /// Compute `b = A*s + e`, generating the rows of A on the fly from `seed_a`.
+    ///
+    /// Computes the same product as [`Kem::mul_add_as_plus_e`] with an expanded
+    /// A, but never materializes the full `N x N` matrix, reducing peak memory
+    /// from `2 * N * N` bytes to a small row-block buffer. Unlike
+    /// [`Kem::mul_add_as_plus_e`], which accumulates into `b`, this method
+    /// overwrites `b`.
+    fn mul_add_as_plus_e_from_seed(&self, seed_a: &[u8], s: &[u16], e: &[u16], b: &mut [u16]) {
+        debug_assert_eq!(s.len(), Self::N_X_N_BAR);
+        debug_assert_eq!(e.len(), Self::N_X_N_BAR);
+        debug_assert_eq!(b.len(), Self::N_X_N_BAR);
+
+        self.expand_a_rows(seed_a, Self::N, &mut |i0, rows| {
+            debug_assert_eq!(rows.len() % Self::N, 0);
+            for (r, row) in rows.chunks_exact(Self::N).enumerate() {
+                let i_bar = (i0 + r) * Self::N_BAR;
+
+                let mut sum = [
+                    e[i_bar],
+                    e[i_bar + 1],
+                    e[i_bar + 2],
+                    e[i_bar + 3],
+                    e[i_bar + 4],
+                    e[i_bar + 5],
+                    e[i_bar + 6],
+                    e[i_bar + 7],
+                ];
+
+                for (j, aij) in row.iter().enumerate() {
+                    sum[0] = sum[0].wrapping_add(aij.wrapping_mul(s[j]));
+                    sum[1] = sum[1].wrapping_add(aij.wrapping_mul(s[Self::N + j]));
+                    sum[2] = sum[2].wrapping_add(aij.wrapping_mul(s[2 * Self::N + j]));
+                    sum[3] = sum[3].wrapping_add(aij.wrapping_mul(s[3 * Self::N + j]));
+                    sum[4] = sum[4].wrapping_add(aij.wrapping_mul(s[4 * Self::N + j]));
+                    sum[5] = sum[5].wrapping_add(aij.wrapping_mul(s[5 * Self::N + j]));
+                    sum[6] = sum[6].wrapping_add(aij.wrapping_mul(s[6 * Self::N + j]));
+                    sum[7] = sum[7].wrapping_add(aij.wrapping_mul(s[7 * Self::N + j]));
+                }
+
+                b[i_bar..i_bar + Self::N_BAR].copy_from_slice(&sum);
+            }
+        });
+    }
+
+    /// Compute `out = s'*A + e'`, generating the rows of A on the fly from `seed_a`.
+    ///
+    /// Computes the same product as [`Kem::mul_add_sa_plus_e`] with an expanded
+    /// A, but never materializes the full `N x N` matrix. Each generated row
+    /// `j` contributes a rank-1 update `out[k] += A[j] * s'[k][j]`, which keeps
+    /// all accesses sequential instead of striding columns through the full
+    /// matrix. Unlike [`Kem::mul_add_sa_plus_e`], which accumulates into `out`,
+    /// this method overwrites `out`.
+    fn mul_add_sa_plus_e_from_seed(&self, seed_a: &[u8], s: &[u16], e: &[u16], out: &mut [u16]) {
+        debug_assert_eq!(s.len(), Self::N_X_N_BAR);
+        debug_assert_eq!(e.len(), Self::N_X_N_BAR);
+        debug_assert_eq!(out.len(), Self::N_BAR_X_N);
+
+        out.copy_from_slice(e);
+        self.expand_a_rows(seed_a, Self::N, &mut |j0, rows| {
+            debug_assert_eq!(rows.len() % Self::N, 0);
+            for (r, row) in rows.chunks_exact(Self::N).enumerate() {
+                let j = j0 + r;
+                for k in 0..Self::N_BAR {
+                    let sp = s[k * Self::N + j];
+                    let out_row = &mut out[k * Self::N..(k + 1) * Self::N];
+                    for (o, aji) in out_row.iter_mut().zip(row.iter()) {
+                        *o = o.wrapping_add(aji.wrapping_mul(sp));
+                    }
+                }
+            }
+        });
     }
 
     /// Multiply by s' on the left.
@@ -679,7 +757,7 @@ pub trait Kem: Params + Expanded + Sample {
         }
     }
 
-    /// Matrix subtraction
+    /// Matrix addition
     fn add(&self, rhs: &[u16], out: &mut [u16]) {
         debug_assert_eq!(rhs.len(), Self::N_BAR_X_N_BAR);
         debug_assert_eq!(out.len(), Self::N_BAR_X_N_BAR);
@@ -896,12 +974,12 @@ pub trait Kem: Params + Expanded + Sample {
         }
     }
 
-    /// Constant time verify for a u16 array
+    /// Constant-time verify for a u16 array
     fn ct_verify(&self, a: &[u16], b: &[u16]) -> Choice {
         a.ct_eq(b)
     }
 
-    /// Constant time select for a u16 array
+    /// Constant-time select for a u16 array
     fn ct_select(&self, choice: Choice, a: &[u8], b: &[u8], out: &mut [u8]) {
         for i in 0..a.len() {
             out[i] = b[i].ct_select(&a[i], choice);

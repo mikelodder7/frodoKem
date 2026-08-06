@@ -75,7 +75,7 @@ eFrodoKEM is intended only for applications that guarantee a small number of
 ciphertexts per public key (for example, at most 2<sup>8</sup>). Prefer standard
 FrodoKEM unless that usage restriction is enforced by the application.
 
-When in doubt use the FrodoKEM algorithm variants.
+When in doubt, use the FrodoKEM algorithm variants.
 
 Keypairs can also be generated deterministically with
 `Algorithm::generate_keypair_from_seed`. The required seed length is exposed as
@@ -90,21 +90,22 @@ with the same care as a secret key.
 To speed up AES, there are a few options available:
 
 - `RUSTFLAGS="--cfg aes_armv8" cargo build --release` ensures that the ARMv8 AES instructions are used if available.
-- `frodo-kem-rs = { version = "0.8", features = ["openssl"] }` uses OpenSSL for AES.
+- `frodo-kem-rs = { version = "0.9", features = ["openssl"] }` uses OpenSSL for AES.
 
-By default, the `aes` feature auto-detects the best AES implementation for your platform
-for x86 and x86_64,
-but not on ARMv8 where it defaults to the software implementation as of this writing.
-To enable the ARMv8 AES instructions, the `aes_armv8` feature is enabled in the `.cargo/config` file in this crate.
+By default, the `aes` crate auto-detects the best AES implementation for x86 and
+x86_64 platforms, but not on ARMv8, where it defaults to the software
+implementation as of this writing.
+To enable the ARMv8 AES instructions, the `aes_armv8` flag is enabled in the `.cargo/config.toml` file in this crate.
 
-Enabling openssl and aesni provides the fastest Aes algorithms.  
+Enabling `openssl` and `aesni` provides the fastest AES algorithms.
 
-openssl tends to be faster than the aes rust crate implementation by about 10-15% on Armv8.
+OpenSSL tends to be faster than the `aes` Rust crate implementation by about 10-15% on ARMv8.
 
 ### NOTE on SHAKE
-Shake auto detects the best implementation for your platform or like AES you can enable `openssl` for it also.
 
-On Armv8, the rust shake implementation is faster than the openssl implementation by about 22-25%.
+SHAKE auto-detects the best implementation for your platform, or, like AES, you can enable the `openssl` feature for it as well.
+
+On ARMv8, the Rust SHAKE implementation is faster than the OpenSSL implementation by about 22-25%.
 
 ## Serialization
 
