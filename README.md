@@ -49,7 +49,7 @@ USE AT YOUR OWN RISK!
 
 ## Minimum Supported Rust Version
 
-This crate requires **Rust 1.85** at a minimum.
+This crate requires **Rust 1.89** at a minimum.
 
 We may change the MSRV in the future, but it will be accompanied by a minor
 version bump.
@@ -142,6 +142,6 @@ conditions.
 [docs-link]: https://docs.rs/frodo-kem-rs/
 [license-image]: https://img.shields.io/badge/license-Apache2.0/MIT-blue.svg
 [downloads-image]: https://img.shields.io/crates/d/frodo-kem-rs.svg
-[msrv-image]: https://img.shields.io/badge/rustc-1.85+-blue.svg
+[msrv-image]: https://img.shields.io/badge/rustc-1.89+-blue.svg
 [iso-standard]: https://www.iso.org/standard/86890.html
 [reference-kats]: https://github.com/microsoft/PQCrypto-LWEKE/tree/7a4e7219d06305e16aef734213001cd8fefbcc14

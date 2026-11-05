@@ -42,6 +42,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Regression test covering all 12 parameter sets that asserts `decapsulate`
   does not return the decryption of a rejected ciphertext.
 
+### Changed
+
+- MSRV raised from 1.85 to 1.89 and now declared as `rust-version` in
+  `Cargo.toml`. `aes` 0.9.3 and later require Rust 1.89.
+- Packing and unpacking use `slice::as_chunks` for their fixed-size chunks.
+- `rstest` dev-dependency bumped to 0.28.
+
 ## [0.9.1]
 
 ### Added

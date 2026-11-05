@@ -562,7 +562,8 @@ pub trait Kem: Params + Expanded + Sample {
 
         self.expand_a_rows(seed_a, Self::N, &mut |i0, rows| {
             debug_assert_eq!(rows.len() % Self::N, 0);
-            for (r, row) in rows.chunks_exact(Self::N).enumerate() {
+            for r in 0..rows.len() / Self::N {
+                let row = &rows[r * Self::N..(r + 1) * Self::N];
                 let i_bar = (i0 + r) * Self::N_BAR;
 
                 let mut sum = [
@@ -608,7 +609,8 @@ pub trait Kem: Params + Expanded + Sample {
         out.copy_from_slice(e);
         self.expand_a_rows(seed_a, Self::N, &mut |j0, rows| {
             debug_assert_eq!(rows.len() % Self::N, 0);
-            for (r, row) in rows.chunks_exact(Self::N).enumerate() {
+            for r in 0..rows.len() / Self::N {
+                let row = &rows[r * Self::N..(r + 1) * Self::N];
                 let j = j0 + r;
                 for k in 0..Self::N_BAR {
                     let sp = s[k * Self::N + j];
@@ -854,8 +856,8 @@ pub trait Kem: Params + Expanded + Sample {
     fn pack(&self, input: &[u16], output: &mut [u8]) {
         if Self::LOG_Q == 16 {
             debug_assert_eq!(output.len(), input.len() * 2);
-            for (word, out) in input.iter().zip(output.chunks_exact_mut(2)) {
-                out.copy_from_slice(&word.to_be_bytes());
+            for (word, out) in input.iter().zip(output.as_chunks_mut::<2>().0) {
+                *out = word.to_be_bytes();
             }
             return;
         }
@@ -864,7 +866,12 @@ pub trait Kem: Params + Expanded + Sample {
             debug_assert_eq!(input.len() % 8, 0);
             debug_assert_eq!(output.len(), (input.len() * 15) / 8);
 
-            for (input, output) in input.chunks_exact(8).zip(output.chunks_exact_mut(15)) {
+            for (input, output) in input
+                .as_chunks::<8>()
+                .0
+                .iter()
+                .zip(output.as_chunks_mut::<15>().0)
+            {
                 let mut acc = 0u128;
                 for word in input {
                     acc = (acc << 15) | u128::from(word & Self::Q_MASK);
@@ -928,8 +935,8 @@ pub trait Kem: Params + Expanded + Sample {
     fn unpack(&self, input: &[u8], output: &mut [u16]) {
         if Self::LOG_Q == 16 {
             debug_assert_eq!(input.len(), output.len() * 2);
-            for (input, out) in input.chunks_exact(2).zip(output.iter_mut()) {
-                *out = u16::from_be_bytes([input[0], input[1]]);
+            for (input, out) in input.as_chunks::<2>().0.iter().zip(output.iter_mut()) {
+                *out = u16::from_be_bytes(*input);
             }
             return;
         }
@@ -938,7 +945,12 @@ pub trait Kem: Params + Expanded + Sample {
             debug_assert_eq!(input.len() % 15, 0);
             debug_assert_eq!(output.len(), (input.len() * 8) / 15);
 
-            for (input, output) in input.chunks_exact(15).zip(output.chunks_exact_mut(8)) {
+            for (input, output) in input
+                .as_chunks::<15>()
+                .0
+                .iter()
+                .zip(output.as_chunks_mut::<8>().0)
+            {
                 let mut acc = 0u128;
                 for byte in input {
                     acc = (acc << 8) | u128::from(*byte);
