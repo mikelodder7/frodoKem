@@ -5,6 +5,43 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.2]
+
+### Security
+
+- **Decapsulation was a decryption oracle that allowed secret-key recovery.**
+  `Algorithm::decapsulate`, `DecryptionKey::decapsulate`, and
+  `hazmat::Kem::decapsulate` returned the recovered message `mu'` even when the
+  Fujisaki-Okamoto re-encryption check rejected the ciphertext. The shared
+  secret correctly fell back to implicit rejection, but `mu'` was
+  `PKE.Decrypt(S, ct)` of an attacker-chosen ciphertext. Because `B'` and `C`
+  are attacker-controlled, each query is a linear query on the secret matrix
+  `S`. Against a static key, an attacker could recover the full secret key on
+  every parameter set with 481 to 1,009 `decapsulate()` calls if `mu'` was
+  observable, or about 24,000 calls if the application revealed only an
+  accept/reject bit (for example, an AEAD tag check keyed by `mu'`, as the
+  crate-level example suggests). All earlier releases are affected.
+  Applications that ignored the returned message, or used
+  `kem::Decapsulate`, which returns only the shared secret, were not affected.
+  Reported by Bhabani Sankar Das ([@007bsd](https://github.com/007bsd)); the
+  same code in RustCrypto `frodo-kem` is tracked as GHSA-hhq3-76c6-9rcj.
+
+### Fixed
+
+- `decapsulate` now releases `mu'` only when the re-encryption check passes.
+  On rejection it returns a pseudorandom message,
+  `SHAKE(0x97 || s || ct)`, selected in constant time, so a rejected ciphertext
+  stays indistinguishable from an accepted one and reveals nothing about `S`.
+  The return types are unchanged; valid ciphertexts decapsulate exactly as
+  before, and all KAT vectors still pass.
+- Documentation: the `decapsulate` doc comments now describe the implicit
+  rejection behavior for both the shared secret and the message.
+
+### Added
+
+- Regression test covering all 12 parameter sets that asserts `decapsulate`
+  does not return the decryption of a rejected ciphertext.
+
 ## [0.9.1]
 
 ### Added

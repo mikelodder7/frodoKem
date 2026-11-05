@@ -78,3 +78,50 @@ fn test_vectors() {
         }
     }
 }
+
+/// Decapsulation must not return `PKE.Decrypt` of a ciphertext that fails the
+/// re-encryption check, or it becomes a decryption oracle that recovers the
+/// secret key (same issue as RustCrypto's GHSA-hhq3-76c6-9rcj).
+#[rstest]
+#[case::aes640(frodo_kem_rs::Algorithm::FrodoKem640Aes)]
+#[case::shake640(frodo_kem_rs::Algorithm::FrodoKem640Shake)]
+#[case::aes976(frodo_kem_rs::Algorithm::FrodoKem976Aes)]
+#[case::shake976(frodo_kem_rs::Algorithm::FrodoKem976Shake)]
+#[case::aes1344(frodo_kem_rs::Algorithm::FrodoKem1344Aes)]
+#[case::shake1344(frodo_kem_rs::Algorithm::FrodoKem1344Shake)]
+#[case::ephemeral_aes640(frodo_kem_rs::Algorithm::EphemeralFrodoKem640Aes)]
+#[case::ephemeral_shake640(frodo_kem_rs::Algorithm::EphemeralFrodoKem640Shake)]
+#[case::ephemeral_aes976(frodo_kem_rs::Algorithm::EphemeralFrodoKem976Aes)]
+#[case::ephemeral_shake976(frodo_kem_rs::Algorithm::EphemeralFrodoKem976Shake)]
+#[case::ephemeral_aes1344(frodo_kem_rs::Algorithm::EphemeralFrodoKem1344Aes)]
+#[case::ephemeral_shake1344(frodo_kem_rs::Algorithm::EphemeralFrodoKem1344Shake)]
+fn decapsulate_does_not_return_decryption_of_rejected_ciphertext(
+    #[case] alg: frodo_kem_rs::Algorithm,
+) {
+    let params = alg.params();
+    let (ek, dk) = alg
+        .generate_keypair_from_seed(vec![7u8; params.key_seed_length])
+        .unwrap();
+    let msg = vec![0xA5u8; params.message_length];
+    let salt = vec![0x11u8; params.salt_length];
+    let (ct, ss) = alg.encapsulate(&ek, &msg, &salt).unwrap();
+
+    let (dec_ss, dec_msg) = alg.decapsulate(&dk, &ct).unwrap();
+    assert_eq!(dec_ss, ss);
+    assert_eq!(dec_msg, msg);
+
+    // Flip the low bit of the last entry of C. The ciphertext still decrypts
+    // to `msg`, but it is no longer a valid encapsulation, so it is rejected.
+    let mut bytes = ct.value().to_vec();
+    bytes[params.ciphertext_length - params.salt_length - 1] ^= 1;
+    let rejected = alg.ciphertext_from_bytes(&bytes).unwrap();
+
+    let (rej_ss, rej_msg) = alg.decapsulate(&dk, &rejected).unwrap();
+    assert_ne!(rej_ss, ss);
+    assert_eq!(rej_msg.len(), params.message_length);
+    assert_ne!(
+        rej_msg, msg,
+        "decapsulate() returned the decryption of a rejected ciphertext"
+    );
+    assert_eq!(alg.decapsulate(&dk, &rejected).unwrap().1, rej_msg);
+}

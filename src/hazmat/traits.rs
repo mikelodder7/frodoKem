@@ -310,10 +310,14 @@ pub trait Kem: Params + Expanded + Sample {
         (ct, ss)
     }
 
-    /// Decapsulate the ciphertext into a shared secret.
+    /// Decapsulate the ciphertext into a shared secret and the recovered message.
     ///
     /// Implements `Frodo.Decaps` from Clause 14 of
     /// [ISO/IEC 18033-2:2006/Amd 2:2026](https://www.iso.org/standard/86890.html).
+    ///
+    /// If the ciphertext is rejected, both the shared secret and the message are
+    /// pseudorandom values derived from the secret key and the ciphertext
+    /// (implicit rejection), so a rejection is indistinguishable to the caller.
     fn decapsulate<
         'a,
         'b,
@@ -458,7 +462,25 @@ pub trait Kem: Params + Expanded + Sample {
         shake.finalize_xof_into(&mut ss.0);
         fin_k.zeroize();
         let mu_prime = if recover_message {
-            g2_in[Self::BYTES_PK_HASH..Self::BYTES_PK_HASH + Self::BYTES_MU].to_vec()
+            // Release µ' only when the re-encryption check passed. Otherwise µ' is
+            // PKE.Decrypt of an attacker-chosen ciphertext, a decryption oracle that
+            // recovers S. On rejection return a pseudorandom value bound to s and the
+            // ciphertext, selected in constant time, so rejection stays implicit.
+            let mut fallback = vec![0u8; Self::BYTES_MU];
+            let mut prf = Self::Shake::default();
+            prf.update(&[0x97]);
+            prf.update(secret_key.random_s());
+            prf.update(ciphertext.0);
+            prf.finalize_xof_into(&mut fallback);
+            let mut out = vec![0u8; Self::BYTES_MU];
+            self.ct_select(
+                choice,
+                &g2_in[Self::BYTES_PK_HASH..Self::BYTES_PK_HASH + Self::BYTES_MU],
+                &fallback,
+                &mut out,
+            );
+            fallback.zeroize();
+            out
         } else {
             Vec::new()
         };

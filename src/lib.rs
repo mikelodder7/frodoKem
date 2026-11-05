@@ -399,6 +399,10 @@ impl DecryptionKey {
 
     /// Decapsulate the [`Ciphertext`] to return the [`SharedSecret`] and
     /// message generated during encapsulation.
+    ///
+    /// If the [`Ciphertext`] is rejected, both the [`SharedSecret`] and the message
+    /// are pseudorandom values derived from the secret key and the ciphertext
+    /// (implicit rejection), so a rejection is indistinguishable to the caller.
     pub fn decapsulate<B: AsRef<[u8]>>(
         &self,
         ciphertext: &Ciphertext,
@@ -1625,6 +1629,10 @@ impl Algorithm {
 
     /// Decapsulate the [`Ciphertext`] to return the [`SharedSecret`] and
     /// message generated during encapsulation.
+    ///
+    /// If the [`Ciphertext`] is rejected, both the [`SharedSecret`] and the message
+    /// are pseudorandom values derived from the secret key and the ciphertext
+    /// (implicit rejection), so a rejection is indistinguishable to the caller.
     pub fn decapsulate(
         &self,
         secret_key: &DecryptionKey,
