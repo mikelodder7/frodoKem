@@ -6,7 +6,7 @@ use super::{Expanded, Kem, Params, Sample};
 use crate::{Error, FrodoResult};
 use ctutils::CtEq;
 use std::marker::PhantomData;
-use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
+use zeroize::{Zeroize, ZeroizeOnDrop};
 
 macro_rules! from_slice_impl {
     ($name:ident, $len:ident, $err:ident) => {
@@ -69,8 +69,9 @@ macro_rules! serde_impl {
             where
                 D: serde::Deserializer<'de>,
             {
-                let bytes =
-                    Zeroizing::new(serdect::slice::deserialize_hex_or_bin_vec(deserializer)?);
+                let bytes = zeroize::Zeroizing::new(serdect::slice::deserialize_hex_or_bin_vec(
+                    deserializer,
+                )?);
                 $name::from_slice(&bytes).map_err(serde::de::Error::custom)
             }
         }
