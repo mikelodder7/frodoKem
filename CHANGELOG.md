@@ -5,6 +5,90 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0]
+
+### Changed
+
+- **Breaking:** `Algorithm::decapsulate`, `DecryptionKey::decapsulate`, and
+  `hazmat::Kem::decapsulate` now return the recovered message `mu'` as
+  `Zeroizing<Vec<u8>>`, so it is wiped when dropped. It derefs to `Vec<u8>`;
+  compare with `*mu` or `mu.as_slice()`. `Zeroizing` is re-exported from the
+  crate root so callers can name it without depending on `zeroize`.
+- **Breaking:** `DecryptionKey::decapsulate` no longer takes an unused generic
+  parameter `B`, which could not be inferred and forced a turbofish at every
+  call site.
+- **Breaking:** `Algorithm::encryption_key_from_decryption_key` now returns
+  `FrodoResult<EncryptionKey>`, and `From<&DecryptionKey> for EncryptionKey`
+  is replaced by `TryFrom`. Both reject a key from another algorithm with
+  `Error::AlgorithmMismatch` and a wrong-length key with
+  `Error::InvalidSecretKeyLength`.
+
+- **Breaking (hazmat):** `Expanded::expand_a_rows` is now the required method
+  and `expand_a` is provided on top of it. The four full-matrix `expand_a`
+  implementations were removed; the KEM only ever used the row-streaming path.
+
+### Added
+
+- `Algorithm::decapsulate_shared_secret` and
+  `DecryptionKey::decapsulate_shared_secret` return only the shared secret and
+  skip message recovery (one SHAKE and two allocations less per call).
+
+### Security
+
+- Zeroize sensitive intermediate values as soon as they are no longer needed,
+  matching the FIPS 203 §3.3 requirement for ML-KEM:
+  - SHAKE hasher state (which absorbs `seedSE`, `mu || salt`, `k`, and `s`) is
+    wiped on drop by enabling the `shake` `zeroize` feature.
+  - Decapsulation wipes the re-encryption matrices `B''` and `C'`, which are
+    derived from `mu'`.
+  - Temporary heap copies made during serde serialization and deserialization
+    (hex strings and byte buffers) are wiped.
+  - `TryFrom<Vec<u8>>` and `TryFrom<Box<[u8]>>` wipe the consumed buffer.
+  - Binary serde deserialization of the top-level types now requests an owned
+    byte buffer (`deserialize_byte_buf`) and wipes it, so formats that hand
+    over a `Vec<u8>` (such as `serde_bare`) no longer drop an unwiped copy of
+    the key or shared secret.
+
+### Fixed
+
+- `hazmat::Kem::generate_keypair_from_seed` checked the seed length only in
+  debug builds; a wrong-length seed in release either panicked on a slice or
+  silently fed the surplus into the matrix-A seed. It now panics in all builds,
+  and the panic conditions of the hazmat `encapsulate` and
+  `generate_keypair_from_seed` methods are documented.
+- The `kem` adapter's compile-time key, ciphertext, and shared-secret sizes
+  are now asserted equal to the corresponding `Params` constants, so a size
+  typo fails the build instead of panicking inside decapsulation.
+- Corrected an inverted comment on the shared-secret selection in
+  `decapsulate`; the code was already right.
+- The `kem` module documents that the arrays returned by the `kem` traits are
+  not zeroized and are the caller's responsibility.
+- The OpenSSL-backed full-matrix `expand_a` implementations leaked an
+  `EVP_CIPHER_CTX` (AES) or one `EVP_MD_CTX` per row (SHAKE) on every call.
+  They are gone with the `Expanded` change above, and the OpenSSL SHAKE row
+  path now allocates one context per expansion instead of one per row.
+- The generic bit-packing `unpack` could spin if the input ran out mid-word.
+  Unreachable with the validated lengths the crate passes, but it now stops.
+
+### Performance
+
+- Decapsulation writes the implicit-rejection message straight into the output
+  buffer and selects in place, removing one allocation and one pass.
+- The secret matrix `S` is converted to and from bytes with `as_chunks` instead
+  of per-element indexing.
+- `ct_select` uses the word-coalesced constant-time slice assignment from
+  `ctutils` instead of a byte loop.
+- `TryFrom<Vec<u8>>` and `TryFrom<Box<[u8]>>` move the buffer into the new
+  value instead of copying it.
+
+- `encryption_key_from_decryption_key` and `EncryptionKey::from(&DecryptionKey)`
+  sliced the secret key without checking its length or algorithm. A short key
+  (for example `DecryptionKey::default()`) or a key from a smaller parameter set
+  panicked; a key from a larger parameter set silently returned a wrong public
+  key labeled with the requested algorithm.
+- Binary deserialization of `EncryptionKey`, `DecryptionKey`, `Ciphertext`, and
+  `SharedSecret` panicked on an empty byte string; it now returns an error.
+
 ## [0.9.2]
 
 ### Security

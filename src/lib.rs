@@ -101,6 +101,8 @@ pub use error::*;
 
 pub mod kem;
 pub use kem::{DecapsulationKey as KemDecapsulationKey, EncapsulationKey as KemEncapsulationKey};
+/// Re-exported so callers can name the type of the message returned by `decapsulate`.
+pub use zeroize::Zeroizing;
 
 #[cfg(feature = "hazmat")]
 pub mod hazmat;
@@ -111,7 +113,6 @@ use hazmat::*;
 
 use ctutils::{Choice, CtEq};
 use rand_core::CryptoRng;
-use std::marker::PhantomData;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 macro_rules! serde_impl {
@@ -127,10 +128,12 @@ macro_rules! serde_impl {
 
                     let mut map = s.serialize_struct(stringify!($name), 2)?;
                     map.serialize_field("algorithm", &self.algorithm.to_string())?;
-                    map.serialize_field("value", &hex::encode(&self.value))?;
+                    let value = Zeroizing::new(hex::encode(&self.value));
+                    map.serialize_field("value", value.as_str())?;
                     map.end()
                 } else {
-                    let mut seq = vec![u8::from(self.algorithm)];
+                    let mut seq = Zeroizing::new(Vec::with_capacity(1 + self.value.len()));
+                    seq.push(u8::from(self.algorithm));
                     seq.extend_from_slice(self.value.as_slice());
                     s.serialize_bytes(&seq)
                 }
@@ -164,7 +167,7 @@ macro_rules! serde_impl {
                             A: serde::de::MapAccess<'de>,
                         {
                             let mut algorithm = Option::<Algorithm>::None;
-                            let mut value = Option::<String>::None;
+                            let mut value = Option::<Zeroizing<String>>::None;
                             while let Some(key) = map.next_key()? {
                                 match key {
                                     Field::Algorithm => {
@@ -179,7 +182,7 @@ macro_rules! serde_impl {
                                         if value.is_some() {
                                             return Err(serde::de::Error::duplicate_field("value"));
                                         }
-                                        value = Some(map.next_value()?);
+                                        value = Some(Zeroizing::new(map.next_value()?));
                                     }
                                 }
                             }
@@ -188,7 +191,9 @@ macro_rules! serde_impl {
                                 .ok_or_else(|| serde::de::Error::missing_field("algorithm"))?;
                             let value =
                                 value.ok_or_else(|| serde::de::Error::missing_field("value"))?;
-                            let value = hex::decode(&value).map_err(serde::de::Error::custom)?;
+                            let value = Zeroizing::new(
+                                hex::decode(value.as_str()).map_err(serde::de::Error::custom)?,
+                            );
                             algorithm
                                 .$from_method(&value)
                                 .map_err(serde::de::Error::custom)
@@ -210,17 +215,29 @@ macro_rules! serde_impl {
                         where
                             E: serde::de::Error,
                         {
+                            let (&algorithm, value) = v
+                                .split_first()
+                                .ok_or_else(|| serde::de::Error::invalid_length(0, &self))?;
                             let algorithm =
-                                Algorithm::try_from(v[0]).map_err(serde::de::Error::custom)?;
+                                Algorithm::try_from(algorithm).map_err(serde::de::Error::custom)?;
 
-                            let value = &v[1..];
                             algorithm
                                 .$from_method(value)
                                 .map_err(serde::de::Error::custom)
                         }
+
+                        // Formats that hand over an owned buffer would otherwise drop it
+                        // unwiped; take ownership so it is zeroized after the copy.
+                        fn visit_byte_buf<E>(self, v: Vec<u8>) -> Result<Self::Value, E>
+                        where
+                            E: serde::de::Error,
+                        {
+                            let v = Zeroizing::new(v);
+                            self.visit_bytes(&v)
+                        }
                     }
 
-                    d.deserialize_bytes(BytesVisitor)
+                    d.deserialize_byte_buf(BytesVisitor)
                 }
             }
         }
@@ -292,8 +309,10 @@ impl AsRef<[u8]> for EncryptionKey {
     }
 }
 
-impl From<&DecryptionKey> for EncryptionKey {
-    fn from(secret_key: &DecryptionKey) -> Self {
+impl TryFrom<&DecryptionKey> for EncryptionKey {
+    type Error = Error;
+
+    fn try_from(secret_key: &DecryptionKey) -> FrodoResult<Self> {
         secret_key
             .algorithm
             .encryption_key_from_decryption_key(secret_key)
@@ -403,11 +422,21 @@ impl DecryptionKey {
     /// If the [`Ciphertext`] is rejected, both the [`SharedSecret`] and the message
     /// are pseudorandom values derived from the secret key and the ciphertext
     /// (implicit rejection), so a rejection is indistinguishable to the caller.
-    pub fn decapsulate<B: AsRef<[u8]>>(
+    ///
+    /// The recovered message is secret and is zeroized when dropped.
+    pub fn decapsulate(
         &self,
         ciphertext: &Ciphertext,
-    ) -> FrodoResult<(SharedSecret, Vec<u8>)> {
+    ) -> FrodoResult<(SharedSecret, Zeroizing<Vec<u8>>)> {
         self.algorithm.decapsulate(self, ciphertext)
+    }
+
+    /// Decapsulate the [`Ciphertext`] to return only the [`SharedSecret`].
+    ///
+    /// Same implicit-rejection behavior as [`DecryptionKey::decapsulate`], but
+    /// skips recovering the message.
+    pub fn decapsulate_shared_secret(&self, ciphertext: &Ciphertext) -> FrodoResult<SharedSecret> {
+        self.algorithm.decapsulate_shared_secret(self, ciphertext)
     }
 }
 
@@ -953,7 +982,15 @@ impl Algorithm {
     }
 
     /// Get the [`EncryptionKey`] from a [`DecryptionKey`]
-    pub fn encryption_key_from_decryption_key(&self, secret_key: &DecryptionKey) -> EncryptionKey {
+    ///
+    /// Returns Err if the key belongs to a different algorithm or has the wrong length.
+    pub fn encryption_key_from_decryption_key(
+        &self,
+        secret_key: &DecryptionKey,
+    ) -> FrodoResult<EncryptionKey> {
+        if secret_key.algorithm != *self {
+            return Err(Error::AlgorithmMismatch);
+        }
         match self {
             #[cfg(feature = "frodo640aes")]
             Self::FrodoKem640Aes => {
@@ -1005,12 +1042,12 @@ impl Algorithm {
     fn inner_encryption_key_from_decryption_key<B: Params>(
         &self,
         secret_key: &DecryptionKey,
-    ) -> EncryptionKey {
-        let sk = DecryptionKeyRef::<B>(secret_key.value.as_slice(), PhantomData);
-        EncryptionKey {
+    ) -> FrodoResult<EncryptionKey> {
+        let sk = DecryptionKeyRef::<B>::from_slice(secret_key.value.as_slice())?;
+        Ok(EncryptionKey {
             algorithm: *self,
             value: sk.public_key().to_vec(),
-        }
+        })
     }
 
     /// Obtain a secret key from a byte slice
@@ -1633,11 +1670,13 @@ impl Algorithm {
     /// If the [`Ciphertext`] is rejected, both the [`SharedSecret`] and the message
     /// are pseudorandom values derived from the secret key and the ciphertext
     /// (implicit rejection), so a rejection is indistinguishable to the caller.
+    ///
+    /// The recovered message is secret and is zeroized when dropped.
     pub fn decapsulate(
         &self,
         secret_key: &DecryptionKey,
         ciphertext: &Ciphertext,
-    ) -> FrodoResult<(SharedSecret, Vec<u8>)> {
+    ) -> FrodoResult<(SharedSecret, Zeroizing<Vec<u8>>)> {
         match self {
             #[cfg(feature = "frodo640aes")]
             Self::FrodoKem640Aes => {
@@ -1690,11 +1729,91 @@ impl Algorithm {
         }
     }
 
+    /// Decapsulate the [`Ciphertext`] to return only the [`SharedSecret`].
+    ///
+    /// Same implicit-rejection behavior as [`Algorithm::decapsulate`], but skips
+    /// recovering the message, which saves one SHAKE and two allocations.
+    pub fn decapsulate_shared_secret(
+        &self,
+        secret_key: &DecryptionKey,
+        ciphertext: &Ciphertext,
+    ) -> FrodoResult<SharedSecret> {
+        match self {
+            #[cfg(feature = "frodo640aes")]
+            Self::FrodoKem640Aes => {
+                self.inner_decapsulate_shared_secret::<FrodoKem640Aes>(secret_key, ciphertext)
+            }
+            #[cfg(feature = "frodo976aes")]
+            Self::FrodoKem976Aes => {
+                self.inner_decapsulate_shared_secret::<FrodoKem976Aes>(secret_key, ciphertext)
+            }
+            #[cfg(feature = "frodo1344aes")]
+            Self::FrodoKem1344Aes => {
+                self.inner_decapsulate_shared_secret::<FrodoKem1344Aes>(secret_key, ciphertext)
+            }
+            #[cfg(feature = "frodo640shake")]
+            Self::FrodoKem640Shake => {
+                self.inner_decapsulate_shared_secret::<FrodoKem640Shake>(secret_key, ciphertext)
+            }
+            #[cfg(feature = "frodo976shake")]
+            Self::FrodoKem976Shake => {
+                self.inner_decapsulate_shared_secret::<FrodoKem976Shake>(secret_key, ciphertext)
+            }
+            #[cfg(feature = "frodo1344shake")]
+            Self::FrodoKem1344Shake => {
+                self.inner_decapsulate_shared_secret::<FrodoKem1344Shake>(secret_key, ciphertext)
+            }
+            #[cfg(feature = "efrodo640aes")]
+            Self::EphemeralFrodoKem640Aes => self
+                .inner_decapsulate_shared_secret::<EphemeralFrodoKem640Aes>(secret_key, ciphertext),
+            #[cfg(feature = "efrodo976aes")]
+            Self::EphemeralFrodoKem976Aes => self
+                .inner_decapsulate_shared_secret::<EphemeralFrodoKem976Aes>(secret_key, ciphertext),
+            #[cfg(feature = "efrodo1344aes")]
+            Self::EphemeralFrodoKem1344Aes => self
+                .inner_decapsulate_shared_secret::<EphemeralFrodoKem1344Aes>(
+                    secret_key, ciphertext,
+                ),
+            #[cfg(feature = "efrodo640shake")]
+            Self::EphemeralFrodoKem640Shake => self
+                .inner_decapsulate_shared_secret::<EphemeralFrodoKem640Shake>(
+                    secret_key, ciphertext,
+                ),
+            #[cfg(feature = "efrodo976shake")]
+            Self::EphemeralFrodoKem976Shake => self
+                .inner_decapsulate_shared_secret::<EphemeralFrodoKem976Shake>(
+                    secret_key, ciphertext,
+                ),
+            #[cfg(feature = "efrodo1344shake")]
+            Self::EphemeralFrodoKem1344Shake => self
+                .inner_decapsulate_shared_secret::<EphemeralFrodoKem1344Shake>(
+                    secret_key, ciphertext,
+                ),
+        }
+    }
+
+    fn inner_decapsulate_shared_secret<K: Kem>(
+        &self,
+        secret_key: &DecryptionKey,
+        ciphertext: &Ciphertext,
+    ) -> FrodoResult<SharedSecret> {
+        if secret_key.algorithm != *self || ciphertext.algorithm != *self {
+            return Err(Error::AlgorithmMismatch);
+        }
+        let sk = DecryptionKeyRef::from_slice(secret_key.value.as_slice())?;
+        let ct = CiphertextRef::from_slice(ciphertext.value.as_slice())?;
+        let ss = K::default().decapsulate_shared_secret(sk, ct);
+        Ok(SharedSecret {
+            algorithm: *self,
+            value: ss.into_vec(),
+        })
+    }
+
     fn inner_decapsulate<K: Kem>(
         &self,
         secret_key: &DecryptionKey,
         ciphertext: &Ciphertext,
-    ) -> FrodoResult<(SharedSecret, Vec<u8>)> {
+    ) -> FrodoResult<(SharedSecret, Zeroizing<Vec<u8>>)> {
         if secret_key.algorithm != *self || ciphertext.algorithm != *self {
             return Err(Error::AlgorithmMismatch);
         }
@@ -1793,7 +1912,12 @@ mod tests {
             assert_eq!(ciphertext.value(), ciphertext.as_ref());
             assert_eq!(shared_secret.algorithm(), algorithm);
             assert_eq!(shared_secret.value(), shared_secret.as_ref());
-            assert_eq!(EncryptionKey::from(&decryption_key).algorithm(), algorithm);
+            assert_eq!(
+                EncryptionKey::try_from(&decryption_key)
+                    .unwrap()
+                    .algorithm(),
+                algorithm
+            );
 
             assert!(EncryptionKey::from_bytes(algorithm, []).is_err());
             assert!(DecryptionKey::from_bytes(algorithm, []).is_err());
@@ -1833,28 +1957,18 @@ mod tests {
             .unwrap();
         let mut modified_ciphertext = ciphertext.clone();
         modified_ciphertext.value[0] ^= 1;
-        let rejected_secret = decryption_key
-            .decapsulate::<&[u8]>(&modified_ciphertext)
-            .unwrap()
-            .0;
-        let repeated_secret = decryption_key
-            .decapsulate::<&[u8]>(&modified_ciphertext)
-            .unwrap()
-            .0;
+        let rejected_secret = decryption_key.decapsulate(&modified_ciphertext).unwrap().0;
+        let repeated_secret = decryption_key.decapsulate(&modified_ciphertext).unwrap().0;
         assert_ne!(rejected_secret, shared_secret);
         assert_eq!(rejected_secret, repeated_secret);
 
         let wrong_ciphertext =
             Ciphertext::from_bytes(other, vec![0; other.params().ciphertext_length]).unwrap();
-        assert!(
-            decryption_key
-                .decapsulate::<&[u8]>(&wrong_ciphertext)
-                .is_err()
-        );
+        assert!(decryption_key.decapsulate(&wrong_ciphertext).is_err());
         assert!(!format!("{decryption_key:?}").contains(&hex::encode(decryption_key.value())));
         assert!(!format!("{shared_secret:?}").contains(&hex::encode(shared_secret.value())));
         assert_eq!(
-            decryption_key.decapsulate::<&[u8]>(&ciphertext).unwrap().0,
+            decryption_key.decapsulate(&ciphertext).unwrap().0,
             shared_secret
         );
     }
@@ -1911,7 +2025,7 @@ mod tests {
         let (our_ct, our_ess) = alg.encapsulate(&our_pk, &mu, []).unwrap();
         let (our_dss, mu_prime) = alg.decapsulate(&our_sk, &our_ct).unwrap();
         assert_eq!(our_ess.value, our_dss.value);
-        assert_eq!(mu, mu_prime);
+        assert_eq!(mu, *mu_prime);
 
         let their_ct = kem.ciphertext_from_bytes(&our_ct.value).unwrap();
         let their_ss = kem.decapsulate(their_sk, their_ct).unwrap();
@@ -1943,7 +2057,7 @@ mod tests {
         let (our_ct, our_ess) = alg.encapsulate(&our_pk, &mu, &salt).unwrap();
         let (our_dss, mu_prime) = alg.decapsulate(&our_sk, &our_ct).unwrap();
         assert_eq!(our_ess.value, our_dss.value);
-        assert_eq!(mu, mu_prime);
+        assert_eq!(mu, *mu_prime);
     }
 
     #[rstest]
@@ -1963,7 +2077,7 @@ mod tests {
         let (our_ct, our_ess) = alg.encapsulate(&our_pk, &mu, &salt).unwrap();
         let (our_dss, mu_prime) = alg.decapsulate(&our_sk, &our_ct).unwrap();
         assert_eq!(our_ess.value, our_dss.value);
-        assert_eq!(mu, mu_prime);
+        assert_eq!(mu, *mu_prime);
     }
 
     macro_rules! serde_test {
@@ -2051,4 +2165,78 @@ mod tests {
         postcard::to_stdvec,
         postcard::from_bytes
     );
+
+    #[test]
+    fn encryption_key_from_decryption_key_rejects_bad_keys() {
+        // An empty default key used to panic on a slice index.
+        assert!(EncryptionKey::try_from(&DecryptionKey::default()).is_err());
+
+        let mut rng = rand_chacha::ChaCha8Rng::from_seed([9u8; 32]);
+        let (ek, dk) = Algorithm::FrodoKem640Shake.generate_keypair(&mut rng);
+        assert_eq!(EncryptionKey::try_from(&dk).unwrap(), ek);
+        // A key from another algorithm is rejected instead of panicking or
+        // returning a mislabeled public key.
+        assert!(matches!(
+            Algorithm::FrodoKem1344Shake.encryption_key_from_decryption_key(&dk),
+            Err(Error::AlgorithmMismatch)
+        ));
+        assert!(matches!(
+            Algorithm::EphemeralFrodoKem640Shake.encryption_key_from_decryption_key(&dk),
+            Err(Error::AlgorithmMismatch)
+        ));
+    }
+
+    #[rstest]
+    #[case::aes640(Algorithm::FrodoKem640Aes)]
+    #[case::shake1344(Algorithm::FrodoKem1344Shake)]
+    #[case::ephemeral_shake976(Algorithm::EphemeralFrodoKem976Shake)]
+    fn decapsulate_shared_secret_matches_decapsulate(#[case] alg: Algorithm) {
+        let mut rng = rand_chacha::ChaCha8Rng::from_seed([11u8; 32]);
+        let (ek, dk) = alg.generate_keypair(&mut rng);
+        let (ct, enc_ss) = alg.encapsulate_with_rng(&ek, &mut rng).unwrap();
+        assert_eq!(dk.decapsulate_shared_secret(&ct).unwrap(), enc_ss);
+
+        // A rejected ciphertext yields the same implicit-rejection secret on both paths.
+        let mut bytes = ct.value().to_vec();
+        bytes[0] ^= 1;
+        let rejected = alg.ciphertext_from_bytes(&bytes).unwrap();
+        let (full, _) = dk.decapsulate(&rejected).unwrap();
+        assert_eq!(dk.decapsulate_shared_secret(&rejected).unwrap(), full);
+        assert_ne!(full, enc_ss);
+
+        let other = Algorithm::FrodoKem640Shake;
+        assert!(matches!(
+            other.decapsulate_shared_secret(&dk, &ct),
+            Err(Error::AlgorithmMismatch)
+        ));
+    }
+
+    #[test]
+    fn decryption_key_decapsulate_infers_types() {
+        let alg = Algorithm::FrodoKem640Shake;
+        let mut rng = rand_chacha::ChaCha8Rng::from_seed([5u8; 32]);
+        let (ek, dk) = alg.generate_keypair(&mut rng);
+        let (ct, enc_ss) = ek.encapsulate_with_rng(&mut rng).unwrap();
+        let (dec_ss, msg): (SharedSecret, Zeroizing<Vec<u8>>) = dk.decapsulate(&ct).unwrap();
+        assert_eq!(enc_ss, dec_ss);
+        assert_eq!(msg.len(), alg.params().message_length);
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn binary_deserialization_rejects_empty_bytes() {
+        // A zero-length byte string in each binary format.
+        let bare = [0u8];
+        let cbor = [0x40u8];
+        let postcard = [0u8];
+
+        assert!(serde_bare::from_slice::<EncryptionKey>(&bare).is_err());
+        assert!(serde_bare::from_slice::<DecryptionKey>(&bare).is_err());
+        assert!(serde_bare::from_slice::<Ciphertext>(&bare).is_err());
+        assert!(serde_bare::from_slice::<SharedSecret>(&bare).is_err());
+        assert!(serde_cbor::from_slice::<DecryptionKey>(&cbor).is_err());
+        assert!(serde_cbor::from_slice::<SharedSecret>(&cbor).is_err());
+        assert!(postcard::from_bytes::<DecryptionKey>(&postcard).is_err());
+        assert!(postcard::from_bytes::<Ciphertext>(&postcard).is_err());
+    }
 }

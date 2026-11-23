@@ -90,7 +90,7 @@ with the same care as a secret key.
 To speed up AES, there are a few options available:
 
 - `RUSTFLAGS="--cfg aes_armv8" cargo build --release` ensures that the ARMv8 AES instructions are used if available.
-- `frodo-kem-rs = { version = "0.9", features = ["openssl"] }` uses OpenSSL for AES.
+- `frodo-kem-rs = { version = "0.10", features = ["openssl"] }` uses OpenSSL for AES.
 
 By default, the `aes` crate auto-detects the best AES implementation for x86 and
 x86_64 platforms, but not on ARMv8, where it defaults to the software

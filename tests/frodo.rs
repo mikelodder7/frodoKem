@@ -108,7 +108,7 @@ fn decapsulate_does_not_return_decryption_of_rejected_ciphertext(
 
     let (dec_ss, dec_msg) = alg.decapsulate(&dk, &ct).unwrap();
     assert_eq!(dec_ss, ss);
-    assert_eq!(dec_msg, msg);
+    assert_eq!(*dec_msg, msg);
 
     // Flip the low bit of the last entry of C. The ciphertext still decrypts
     // to `msg`, but it is no longer a valid encapsulation, so it is rejected.
@@ -120,7 +120,7 @@ fn decapsulate_does_not_return_decryption_of_rejected_ciphertext(
     assert_ne!(rej_ss, ss);
     assert_eq!(rej_msg.len(), params.message_length);
     assert_ne!(
-        rej_msg, msg,
+        *rej_msg, msg,
         "decapsulate() returned the decryption of a rejected ciphertext"
     );
     assert_eq!(alg.decapsulate(&dk, &rejected).unwrap().1, rej_msg);

@@ -6,10 +6,10 @@ use super::{Expanded, Kem, Params, Sample};
 use crate::{Error, FrodoResult};
 use ctutils::CtEq;
 use std::marker::PhantomData;
-use zeroize::{Zeroize, ZeroizeOnDrop};
+use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
 macro_rules! from_slice_impl {
-    ($name:ident) => {
+    ($name:ident, $len:ident, $err:ident) => {
         impl<P: Params> TryFrom<&[u8]> for $name<P> {
             type Error = Error;
 
@@ -22,15 +22,22 @@ macro_rules! from_slice_impl {
             type Error = Error;
 
             fn try_from(bytes: Box<[u8]>) -> FrodoResult<Self> {
-                Self::from_slice(bytes.as_ref())
+                Self::try_from(bytes.into_vec())
             }
         }
 
         impl<P: Params> TryFrom<Vec<u8>> for $name<P> {
             type Error = Error;
 
-            fn try_from(bytes: Vec<u8>) -> FrodoResult<Self> {
-                Self::from_slice(bytes.as_ref())
+            fn try_from(mut bytes: Vec<u8>) -> FrodoResult<Self> {
+                // Take ownership instead of copying. On the error path the
+                // consumed buffer may hold secret material, so wipe it first.
+                let len = bytes.len();
+                if len != P::$len {
+                    bytes.zeroize();
+                    return Err(Error::$err(len));
+                }
+                Ok(Self(bytes, PhantomData))
             }
         }
 
@@ -62,7 +69,8 @@ macro_rules! serde_impl {
             where
                 D: serde::Deserializer<'de>,
             {
-                let bytes = serdect::slice::deserialize_hex_or_bin_vec(deserializer)?;
+                let bytes =
+                    Zeroizing::new(serdect::slice::deserialize_hex_or_bin_vec(deserializer)?);
                 $name::from_slice(&bytes).map_err(serde::de::Error::custom)
             }
         }
@@ -85,7 +93,7 @@ impl<P: Params> Default for Ciphertext<P> {
     }
 }
 
-from_slice_impl!(Ciphertext);
+from_slice_impl!(Ciphertext, CIPHERTEXT_LENGTH, InvalidCiphertextLength);
 
 serde_impl!(Ciphertext);
 
@@ -218,7 +226,7 @@ impl<'a, P: Params> From<&'a EncryptionKey<P>> for EncryptionKeyRef<'a, P> {
     }
 }
 
-from_slice_impl!(EncryptionKey);
+from_slice_impl!(EncryptionKey, PUBLIC_KEY_LENGTH, InvalidPublicKeyLength);
 
 serde_impl!(EncryptionKey);
 
@@ -344,7 +352,7 @@ impl<P: Params> Drop for DecryptionKey<P> {
     }
 }
 
-from_slice_impl!(DecryptionKey);
+from_slice_impl!(DecryptionKey, SECRET_KEY_LENGTH, InvalidSecretKeyLength);
 
 serde_impl!(DecryptionKey);
 
@@ -512,7 +520,11 @@ impl<P: Params> Drop for SharedSecret<P> {
     }
 }
 
-from_slice_impl!(SharedSecret);
+from_slice_impl!(
+    SharedSecret,
+    SHARED_SECRET_LENGTH,
+    InvalidSharedSecretLength
+);
 
 serde_impl!(SharedSecret);
 
@@ -940,62 +952,6 @@ pub struct FrodoAes<P: Params>(pub(crate) PhantomData<P>);
 impl<P: Params> Expanded for FrodoAes<P> {
     const METHOD: &'static str = "AES";
 
-    fn expand_a(&self, seed_a: &[u8], a: &mut [u16]) {
-        use aes::{
-            Aes128Enc, Block,
-            cipher::{BlockCipherEncrypt, KeyInit, KeySizeUser},
-        };
-
-        debug_assert_eq!(a.len(), P::N_X_N);
-        debug_assert_eq!(seed_a.len(), P::BYTES_SEED_A);
-        debug_assert_eq!(seed_a.len(), <Aes128Enc as KeySizeUser>::key_size());
-        let enc = Aes128Enc::new_from_slice(seed_a).expect("a valid key size of 16 bytes");
-
-        // Original Reference Code is much slower
-        // let mut in_block = Block::default();
-        // let mut out_block = Block::default();
-        // for i in 0..P::N {
-        //     let ii = i as u16;
-        //     in_block[..2].copy_from_slice(&ii.to_le_bytes());
-        //     let row = i * P::N;
-        //     for j in (0..P::N).step_by(P::STRIPE_STEP) {
-        //         let jj = j as u16;
-        //         in_block[2..4].copy_from_slice(&jj.to_le_bytes());
-        //         enc.encrypt_block_b2b(&in_block, &mut out_block);
-        //
-        //         for k in 0..P::STRIPE_STEP {
-        //             a[row + j + k] =
-        //                 u16::from_le_bytes([out_block[2 * k], out_block[2 * k + 1]]) & P::Q_MASK;
-        //         }
-        //     }
-        // }
-
-        // Treat `a` as blocks then overwrite in place to avoid allocation
-        let blocks = unsafe {
-            std::slice::from_raw_parts_mut(a.as_mut_ptr() as *mut Block, P::N_X_N / P::STRIPE_STEP)
-        };
-        let mut pos = 0;
-        for i in 0..P::N {
-            let ii = i as u16;
-            let mut block = Block::default();
-            block[..2].copy_from_slice(&ii.to_le_bytes());
-            for j in (0..P::N).step_by(P::STRIPE_STEP) {
-                let jj = j as u16;
-                block[2..4].copy_from_slice(&jj.to_le_bytes());
-                blocks[pos] = block;
-                pos += 1;
-            }
-        }
-
-        enc.encrypt_blocks(blocks);
-        #[cfg(target_endian = "big")]
-        {
-            for i in a.iter_mut() {
-                *i = i.swap_bytes();
-            }
-        }
-    }
-
     fn expand_a_rows(&self, seed_a: &[u8], n: usize, f: &mut dyn FnMut(usize, &[u16])) {
         use aes::{
             Aes128Enc, Block,
@@ -1065,61 +1021,6 @@ impl<P: Params> Expanded for FrodoAes<P> {
 ))]
 impl<P: Params> Expanded for FrodoAes<P> {
     const METHOD: &'static str = "AES";
-
-    fn expand_a(&self, seed_a: &[u8], a: &mut [u16]) {
-        debug_assert_eq!(a.len(), P::N_X_N);
-        debug_assert_eq!(seed_a.len(), P::BYTES_SEED_A);
-        debug_assert_eq!(seed_a.len(), 16);
-
-        let in_blocks =
-            unsafe { std::slice::from_raw_parts_mut(a.as_mut_ptr() as *mut u8, P::N_X_N * 2) };
-        let mut in_block = [0u8; 16];
-        let mut pos = 0;
-        for i in 0..P::N {
-            let ii = i as u16;
-            in_block[..2].copy_from_slice(&ii.to_le_bytes());
-            for j in (0..P::N).step_by(P::STRIPE_STEP) {
-                let jj = j as u16;
-                in_block[2..4].copy_from_slice(&jj.to_le_bytes());
-                in_blocks[pos..pos + 16].copy_from_slice(&in_block);
-                pos += 16;
-            }
-        }
-        unsafe {
-            let aes_key_schedule = openssl_sys::EVP_CIPHER_CTX_new();
-            if aes_key_schedule.is_null() {
-                panic!("EVP_CIPHER_CTX_new failed");
-            }
-            if openssl_sys::EVP_EncryptInit_ex(
-                aes_key_schedule,
-                openssl_sys::EVP_aes_128_ecb(),
-                std::ptr::null_mut(),
-                seed_a.as_ptr(),
-                std::ptr::null_mut(),
-            ) != 1
-            {
-                panic!("EVP_EncryptInit_ex failed");
-            }
-            let mut olen = in_blocks.len() as i32;
-            let ilen = in_blocks.len() as i32;
-            if openssl_sys::EVP_EncryptUpdate(
-                aes_key_schedule,
-                in_blocks.as_mut_ptr(),
-                &mut olen,
-                in_blocks.as_ptr(),
-                ilen,
-            ) != 1
-            {
-                panic!("EVP_EncryptInit_ex failed");
-            }
-        }
-        #[cfg(target_endian = "big")]
-        {
-            for i in a.iter_mut() {
-                *i = i.swap_bytes();
-            }
-        }
-    }
 
     fn expand_a_rows(&self, seed_a: &[u8], n: usize, f: &mut dyn FnMut(usize, &[u16])) {
         debug_assert_eq!(n, P::N);
@@ -1220,39 +1121,6 @@ pub struct FrodoShake<P: Params>(pub PhantomData<P>);
 impl<P: Params> Expanded for FrodoShake<P> {
     const METHOD: &'static str = "SHAKE";
 
-    fn expand_a(&self, seed_a: &[u8], a: &mut [u16]) {
-        use shake::{
-            Shake128,
-            digest::{ExtendableOutputReset, Update},
-        };
-
-        debug_assert_eq!(a.len(), P::N_X_N);
-        debug_assert_eq!(seed_a.len(), P::BYTES_SEED_A);
-
-        let mut seed_separated = vec![0u8; P::TWO_PLUS_BYTES_SEED_A];
-        let mut shake = Shake128::default();
-
-        seed_separated[2..].copy_from_slice(seed_a);
-
-        for i in 0..P::N {
-            let ii = i * P::N;
-
-            seed_separated[0..2].copy_from_slice(&(i as u16).to_le_bytes());
-            shake.update(&seed_separated);
-            let a_temp = &mut a[ii..ii + P::N];
-            let bytes = unsafe {
-                std::slice::from_raw_parts_mut(a_temp.as_mut_ptr() as *mut u8, a_temp.len() * 2)
-            };
-            shake.finalize_xof_reset_into(bytes);
-            #[cfg(target_endian = "big")]
-            {
-                for i in a_temp {
-                    *i = i.swap_bytes();
-                }
-            }
-        }
-    }
-
     fn expand_a_rows(&self, seed_a: &[u8], n: usize, f: &mut dyn FnMut(usize, &[u16])) {
         use shake::{
             Shake128,
@@ -1304,58 +1172,6 @@ impl<P: Params> Expanded for FrodoShake<P> {
 impl<P: Params> Expanded for FrodoShake<P> {
     const METHOD: &'static str = "SHAKE";
 
-    fn expand_a(&self, seed_a: &[u8], a: &mut [u16]) {
-        debug_assert_eq!(a.len(), P::N_X_N);
-        debug_assert_eq!(seed_a.len(), P::BYTES_SEED_A);
-
-        // let mut a_row = vec![0u8; P::TWO_N];
-        let mut seed_separated = vec![0u8; P::TWO_PLUS_BYTES_SEED_A];
-
-        seed_separated[2..].copy_from_slice(seed_a);
-
-        for i in 0..P::N {
-            let ii = i * P::N;
-
-            seed_separated[0..2].copy_from_slice(&(i as u16).to_le_bytes());
-            unsafe {
-                let shake = openssl_sys::EVP_MD_CTX_new();
-                if shake.is_null() {
-                    panic!("EVP_MD_CTX_new failed");
-                }
-                if openssl_sys::EVP_DigestInit_ex(
-                    shake,
-                    openssl_sys::EVP_shake128(),
-                    std::ptr::null_mut(),
-                ) != 1
-                {
-                    panic!("EVP_DigestInit_ex failed");
-                }
-                if openssl_sys::EVP_DigestUpdate(
-                    shake,
-                    seed_separated.as_ptr() as *const _,
-                    seed_separated.len(),
-                ) != 1
-                {
-                    panic!("EVP_DigestUpdate failed");
-                }
-                if openssl_sys::EVP_DigestFinalXOF(
-                    shake,
-                    a[ii..ii + P::N].as_mut_ptr() as *mut u8,
-                    P::TWO_N,
-                ) != 1
-                {
-                    panic!("EVP_DigestFinalXOF failed");
-                }
-            }
-        }
-        #[cfg(target_endian = "big")]
-        {
-            for i in a.iter_mut() {
-                *i = i.swap_bytes();
-            }
-        }
-    }
-
     fn expand_a_rows(&self, seed_a: &[u8], n: usize, f: &mut dyn FnMut(usize, &[u16])) {
         debug_assert_eq!(n, P::N);
         debug_assert_eq!(seed_a.len(), P::BYTES_SEED_A);
@@ -1364,13 +1180,13 @@ impl<P: Params> Expanded for FrodoShake<P> {
         seed_separated[2..].copy_from_slice(seed_a);
 
         let mut row = vec![0u16; n];
-        for i in 0..n {
-            seed_separated[0..2].copy_from_slice(&(i as u16).to_le_bytes());
-            unsafe {
-                let shake = openssl_sys::EVP_MD_CTX_new();
-                if shake.is_null() {
-                    panic!("EVP_MD_CTX_new failed");
-                }
+        unsafe {
+            let shake = openssl_sys::EVP_MD_CTX_new();
+            if shake.is_null() {
+                panic!("EVP_MD_CTX_new failed");
+            }
+            for i in 0..n {
+                seed_separated[0..2].copy_from_slice(&(i as u16).to_le_bytes());
                 if openssl_sys::EVP_DigestInit_ex(
                     shake,
                     openssl_sys::EVP_shake128(),
@@ -1399,15 +1215,15 @@ impl<P: Params> Expanded for FrodoShake<P> {
                 {
                     panic!("EVP_DigestFinalXOF failed");
                 }
-                openssl_sys::EVP_MD_CTX_free(shake);
-            }
-            #[cfg(target_endian = "big")]
-            {
-                for i in row.iter_mut() {
-                    *i = i.swap_bytes();
+                #[cfg(target_endian = "big")]
+                {
+                    for i in row.iter_mut() {
+                        *i = i.swap_bytes();
+                    }
                 }
+                f(i, &row);
             }
-            f(i, &row);
+            openssl_sys::EVP_MD_CTX_free(shake);
         }
     }
 }

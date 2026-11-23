@@ -6,10 +6,10 @@ use crate::hazmat::{
     Ciphertext, CiphertextRef, DecryptionKey, DecryptionKeyRef, EncryptionKey, EncryptionKeyRef,
     SharedSecret,
 };
-use ctutils::{Choice, CtEq, CtSelect};
+use ctutils::{Choice, CtAssign, CtEq};
 use rand_core::CryptoRng;
 use shake::digest::{ExtendableOutput, ExtendableOutputReset, Update};
-use zeroize::Zeroize;
+use zeroize::{Zeroize, Zeroizing};
 
 /// Trait for implementing the FrodoKEM sampling algorithm
 ///
@@ -30,22 +30,25 @@ pub trait Sample: Default {
 pub trait Expanded: Default {
     /// The method used to expand the seed
     const METHOD: &'static str;
-    /// Expand the seed to produce the matrix A
-    /// Generate matrix A (N x N) row-wise
-    fn expand_a(&self, seed_a: &[u8], a: &mut [u16]);
-
     /// Visit the rows of matrix A (`n` x `n`) in order without requiring the
     /// full matrix to be materialized.
     ///
     /// `f` is called with the index of the first row in the block and a slice
     /// containing one or more whole rows (`rows.len()` is a multiple of `n`).
-    /// Implementations that can derive rows independently override this to
-    /// stream small row blocks, reducing peak memory from `2 * n * n` bytes to
-    /// a few rows; the default falls back to [`Expanded::expand_a`].
-    fn expand_a_rows(&self, seed_a: &[u8], n: usize, f: &mut dyn FnMut(usize, &[u16])) {
-        let mut a = vec![0u16; n * n];
-        self.expand_a(seed_a, &mut a);
-        f(0, &a);
+    /// This is the method the KEM uses; streaming row blocks keeps peak memory
+    /// at a few rows instead of `2 * n * n` bytes.
+    fn expand_a_rows(&self, seed_a: &[u8], n: usize, f: &mut dyn FnMut(usize, &[u16]));
+
+    /// Expand the seed to produce the full matrix A (`N x N`) row-wise.
+    ///
+    /// `a.len()` must be a square; the default collects the blocks produced
+    /// by [`Expanded::expand_a_rows`].
+    fn expand_a(&self, seed_a: &[u8], a: &mut [u16]) {
+        let n = a.len().isqrt();
+        debug_assert_eq!(n * n, a.len());
+        self.expand_a_rows(seed_a, n, &mut |i0, rows| {
+            a[i0 * n..i0 * n + rows.len()].copy_from_slice(rows);
+        });
     }
 }
 
@@ -142,11 +145,16 @@ pub trait Kem: Params + Expanded + Sample {
     ///
     /// The seed is used as the randomness part of the keypair
     /// and will be zeroized after the keypair is generated.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `randomness.len() != Self::KEY_SEED_SIZE`. The checked
+    /// [`crate::Algorithm::generate_keypair_from_seed`] returns an error instead.
     fn generate_keypair_from_seed(
         &self,
         randomness: &mut [u8],
     ) -> (EncryptionKey<Self>, DecryptionKey<Self>) {
-        debug_assert_eq!(randomness.len(), Self::KEY_SEED_SIZE);
+        assert_eq!(randomness.len(), Self::KEY_SEED_SIZE);
         let mut sk = DecryptionKey::default();
         let mut pk = EncryptionKey::default();
 
@@ -190,13 +198,14 @@ pub trait Kem: Params + Expanded + Sample {
 
         self.pack(&matrix_b, pk.matrix_b_mut());
 
+        for (out, s) in sk
+            .matrix_s_mut()
+            .as_chunks_mut::<2>()
+            .0
+            .iter_mut()
+            .zip(&bytes_se[..Self::N_X_N_BAR])
         {
-            let matrix_s = sk.matrix_s_mut();
-            for (i, b) in bytes_se[..Self::N_X_N_BAR].iter().enumerate() {
-                let bb = b.to_le_bytes();
-                matrix_s[i * 2] = bb[0];
-                matrix_s[i * 2 + 1] = bb[1];
-            }
+            *out = s.to_le_bytes();
         }
 
         shake.update(&pk.0);
@@ -229,6 +238,11 @@ pub trait Kem: Params + Expanded + Sample {
     ///
     /// Implements deterministic `Frodo.Encaps` from Clause 14 of
     /// [ISO/IEC 18033-2:2006/Amd 2:2026](https://www.iso.org/standard/86890.html).
+    ///
+    /// # Panics
+    ///
+    /// Panics if `mu.len() != Self::BYTES_MU` or `salt.len() != Self::BYTES_SALT`.
+    /// The checked [`crate::Algorithm::encapsulate`] returns an error instead.
     fn encapsulate<'a, P: Into<EncryptionKeyRef<'a, Self>>>(
         &self,
         public_key: P,
@@ -318,6 +332,8 @@ pub trait Kem: Params + Expanded + Sample {
     /// If the ciphertext is rejected, both the shared secret and the message are
     /// pseudorandom values derived from the secret key and the ciphertext
     /// (implicit rejection), so a rejection is indistinguishable to the caller.
+    ///
+    /// The recovered message is secret and is zeroized when dropped.
     fn decapsulate<
         'a,
         'b,
@@ -327,7 +343,7 @@ pub trait Kem: Params + Expanded + Sample {
         &self,
         secret_key: S,
         ciphertext: C,
-    ) -> (SharedSecret<Self>, Vec<u8>) {
+    ) -> (SharedSecret<Self>, Zeroizing<Vec<u8>>) {
         self.decapsulate_inner(secret_key, ciphertext, true)
     }
 
@@ -359,7 +375,7 @@ pub trait Kem: Params + Expanded + Sample {
         secret_key: S,
         ciphertext: C,
         recover_message: bool,
-    ) -> (SharedSecret<Self>, Vec<u8>) {
+    ) -> (SharedSecret<Self>, Zeroizing<Vec<u8>>) {
         let secret_key = secret_key.into();
         let ciphertext = ciphertext.into();
 
@@ -367,12 +383,11 @@ pub trait Kem: Params + Expanded + Sample {
         let mut matrix_s = vec![0u16; Self::N_X_N_BAR];
         let pk = EncryptionKeyRef::<Self>::from_validated_slice(secret_key.public_key());
 
-        for (i, b) in matrix_s.iter_mut().enumerate() {
-            let bb = [
-                secret_key.matrix_s()[i * 2],
-                secret_key.matrix_s()[i * 2 + 1],
-            ];
-            *b = u16::from_le_bytes(bb);
+        for (b, bytes) in matrix_s
+            .iter_mut()
+            .zip(secret_key.matrix_s().as_chunks::<2>().0)
+        {
+            *b = u16::from_le_bytes(*bytes);
         }
 
         let mut matrix_bp = vec![0u16; Self::N_X_N_BAR];
@@ -450,7 +465,7 @@ pub trait Kem: Params + Expanded + Sample {
             self.ct_verify(&matrix_bp, &matrix_bpp) & self.ct_verify(&matrix_c, &matrix_cc);
 
         let mut fin_k = vec![0u8; Self::SHARED_SECRET_LENGTH];
-        // Take k if choice == 0, otherwise take s
+        // `choice` is TRUE when the re-encryption matches: take k'. Otherwise take s.
         self.ct_select(
             choice,
             &g2_out[Self::BYTES_SEED_SE..],
@@ -466,27 +481,25 @@ pub trait Kem: Params + Expanded + Sample {
             // PKE.Decrypt of an attacker-chosen ciphertext, a decryption oracle that
             // recovers S. On rejection return a pseudorandom value bound to s and the
             // ciphertext, selected in constant time, so rejection stays implicit.
-            let mut fallback = vec![0u8; Self::BYTES_MU];
+            let mut out = Zeroizing::new(vec![0u8; Self::BYTES_MU]);
             let mut prf = Self::Shake::default();
             prf.update(&[0x97]);
             prf.update(secret_key.random_s());
             prf.update(ciphertext.0);
-            prf.finalize_xof_into(&mut fallback);
-            let mut out = vec![0u8; Self::BYTES_MU];
-            self.ct_select(
-                choice,
+            prf.finalize_xof_into(&mut out);
+            out.ct_assign(
                 &g2_in[Self::BYTES_PK_HASH..Self::BYTES_PK_HASH + Self::BYTES_MU],
-                &fallback,
-                &mut out,
+                choice,
             );
-            fallback.zeroize();
             out
         } else {
-            Vec::new()
+            Zeroizing::new(Vec::new())
         };
 
         matrix_s.zeroize();
         matrix_w.zeroize();
+        matrix_bpp.zeroize();
+        matrix_cc.zeroize();
         sp.zeroize();
         g2_out.zeroize();
         g2_in[Self::BYTES_PK_HASH..Self::BYTES_PK_HASH + Self::BYTES_MU].zeroize();
@@ -997,6 +1010,8 @@ pub trait Kem: Params + Expanded + Sample {
                         w = input[j];
                         j += 1;
                         bits = 8;
+                    } else {
+                        break;
                     }
                 } else {
                     break;
@@ -1013,11 +1028,10 @@ pub trait Kem: Params + Expanded + Sample {
         a.ct_eq(b)
     }
 
-    /// Constant-time select for a u16 array
+    /// Constant-time select: `out = a` if `choice` is TRUE, otherwise `out = b`
     fn ct_select(&self, choice: Choice, a: &[u8], b: &[u8], out: &mut [u8]) {
-        for i in 0..a.len() {
-            out[i] = b[i].ct_select(&a[i], choice);
-        }
+        out.copy_from_slice(b);
+        out.ct_assign(a, choice);
     }
 }
 
@@ -1042,7 +1056,7 @@ mod tests {
     impl Expanded for GenericPacking {
         const METHOD: &'static str = "test";
 
-        fn expand_a(&self, _seed_a: &[u8], _a: &mut [u16]) {}
+        fn expand_a_rows(&self, _seed_a: &[u8], _n: usize, _f: &mut dyn FnMut(usize, &[u16])) {}
     }
 
     impl Sample for GenericPacking {

@@ -1,4 +1,11 @@
 //! Implementations of the traits from the [`kem`] crate.
+//!
+//! The `kem` traits return key and shared-secret bytes as plain
+//! [`hybrid_array::Array`] values, which are not zeroized on drop. The
+//! [`DecapsulationKey`] itself wipes its secret material, but the arrays
+//! returned by [`KeyExport::to_bytes`], [`Decapsulate::decapsulate`], and
+//! [`kem::Encapsulate::encapsulate_with_rng`] are the caller's to wipe, for
+//! example by wrapping them in [`zeroize::Zeroizing`].
 
 use crate::hazmat;
 use hybrid_array::{Array, ArraySize};
@@ -166,6 +173,18 @@ where
 
 macro_rules! impl_kem {
     ($feature:literal, $kem:ty, $ek:ty, $dk:ty, $ct:ty, $ss:ty) => {
+        // `Decapsulate::decapsulate` trusts these sizes without a runtime
+        // length check, so tie them to `Params` at compile time.
+        #[cfg(feature = $feature)]
+        const _: () = {
+            use hazmat::Params;
+            use hybrid_array::typenum::Unsigned;
+            assert!(<$ek as Unsigned>::USIZE == <$kem as Params>::PUBLIC_KEY_LENGTH);
+            assert!(<$dk as Unsigned>::USIZE == <$kem as Params>::SECRET_KEY_LENGTH);
+            assert!(<$ct as Unsigned>::USIZE == <$kem as Params>::CIPHERTEXT_LENGTH);
+            assert!(<$ss as Unsigned>::USIZE == <$kem as Params>::SHARED_SECRET_LENGTH);
+        };
+
         #[cfg(feature = $feature)]
         impl KemSizes for $kem {
             type EncapsulationKeySize = $ek;
